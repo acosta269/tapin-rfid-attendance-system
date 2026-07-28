@@ -7,16 +7,19 @@ BUZZER_USE_PWM = True           # set True for passive buzzers that need PWM ton
 BUZZER_FREQ = 2000              # default tone frequency in Hz for PWM
 BUZZER_DUTY = 512               # default PWM duty (10-bit range typical)
 
-## i2c pinouts
-SLC_PINOUT = 22                             # slc pin
-SDA_PINOUT = 21                             # sda pin
+## lcd configuration
+LCD_ADDR = 0x27                 # I2C address of the LCD
 
-## pinouts
-SLK_PINOUT = 18                             # slk pin
-MOSI_PINOUT = 23                            # mosi pin
-MISO_PINOUT = 19                            # miso pin
-CS_PINOUT = 5                               # cs pin
-RST_PINOUT = 22                             # rst pin
+## i2c pinouts
+I2C_SDA_PINOUT = 21                         # sda pin
+I2C_SCL_PINOUT = 22                         # scl pin 
+
+## rfid pinouts
+RFID_RST_PINOUT = 4                       # rst pin
+RFID_MISO_PINOUT = 19                       # miso pin
+RFID_MOSI_PINOUT = 23                       # mosi pin
+RFID_SCK_PINOUT = 18                        # sck pin
+RFID_SDA_PINOUT = 5                         # sda pin
 
 ## identification
 DEVICE_ID = "esp32-rfid-001"                # unique device identifier *version - unit
