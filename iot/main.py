@@ -15,12 +15,12 @@ from configs import parameters as param
 ## classes
 ## MFRC522 driver
 class MFRC522:
-    def __init__(self, sck=param.SLK_PINOUT, mosi=param.MOSI_PINOUT, miso=param.MISO_PINOUT, cs=param.CS_PINOUT, rst=param.RST_PINOUT):
-        self.rst = Pin(rst, Pin.OUT)
-        self.cs = Pin(cs, Pin.OUT)
+    def __init__(self, sck=param.RFID_SCK_PINOUT, mosi=param.RFID_MOSI_PINOUT, miso=param.RFID_MISO_PINOUT, cs=param.RFID_SDA_PINOUT, rst=param.RFID_RST_PINOUT):
+        self.rst = machine.Pin(rst, machine.Pin.OUT)
+        self.cs = machine.Pin(cs, machine.Pin.OUT)
         self.rst.value(1)
         self.cs.value(1)
-        self.spi = SPI(1, baudrate=1_000_000, sck=Pin(sck), mosi=Pin(mosi), miso=Pin(miso))
+        self.spi = machine.SPI(1, baudrate=1_000_000, sck=machine.Pin(sck), mosi=machine.Pin(mosi), miso=machine.Pin(miso))
         self._init()
 
     def _write(self, reg, val):
@@ -160,29 +160,100 @@ class Buzzer:
 
 ## functions
 def post_data(data):
-
     url = f"{API_URL}/api/receive-rfid"
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
+    headers = {"Content-Type": "application/json"}
     try:
-        payload_str = "&".join([f"{k}={v}" for k, v in data.items()])
-        r = requests.post(url, data=payload_str, headers=headers)
+        r = requests.post(url, json=data, headers=headers, timeout=10)
         r.close()
-        return True
-    except:
+        return r.status_code == 200
+    except Exception as e:
+        tprint(PRINTSTATUS.ERROR, f"Send error: {e}")
         return False
 
-
 def fetch_data():
-
     url = f"{API_URL}/api/get-latest-rfid"
-
     try:
         r = requests.get(url)
         r.close()
-    except:
-        pass
+        return r.json()
+    except Exception as e:
+        tprint(PRINTSTATUS.ERROR, f"Fetch error: {e}")
+        return None
 
+"""
 ## main
 def main():
-    pass
+    # Initialize hardware
+    rfid = MFRC522()
+    i2c = machine.I2C(0, scl=machine.Pin(param.I2C_SCL_PINOUT), sda=machine.Pin(param.I2C_SDA_PINOUT), freq=400000)
+    lcd = I2cLcd(i2c, param.LCD_ADDR, rows=2, cols=16)
+    buzzer = Buzzer(param.BUZZER_PIN)
+
+    lcd.clear()
+    lcd.putstr("System Ready")
+
+    last_uid = None
+
+    while True:
+        uid = rfid.get_uid()
+
+        if uid and uid != last_uid:
+            uid_str = "".join(f"{b:02X}" for b in uid)
+            last_uid = uid_str
+
+            lcd.clear()
+            lcd.putstr("Scanned:")
+            lcd.move_to(0, 1)
+            lcd.putstr(uid_str[:16])
+
+            buzzer.on()
+            time.sleep_ms(100)
+            buzzer.off()
+
+            # Send to PythonAnywhere API
+            success = post_data({"rfid_id": uid_str})
+            if success:
+                tprint(PRINTSTATUS.SUCCESS, f"Sent: {uid_str}")
+            else:
+                tprint(PRINTSTATUS.ERROR, f"Send failed: {uid_str}")
+
+        time.sleep_ms(200)
+"""
+
+def main():
+    # Initialize RFID reader
+    rfid = MFRC522()
+    tprint(PRINTSTATUS.INFO, "Checking RFID reader...")
+
+    # --- SELF-CHECK BEFORE STARTING ---
+    reader_ok = False
+    for _ in range(5):  # Try 5 times to confirm
+        if rfid.request():
+            reader_ok = True
+            break
+        time.sleep_ms(100)
+
+    if not reader_ok:
+        tprint(PRINTSTATUS.ERROR, "RFID reader NOT DETECTED! Check wiring/pins.")
+        while True:
+            time.sleep_ms(1000)  # Halt if no reader
+    else:
+        tprint(PRINTSTATUS.SUCCESS, "RFID reader OK - Ready for cards")
+
+    last_uid = None
+
+    # --- MAIN SCAN LOOP ---
+    while True:
+        uid = rfid.get_uid()
+
+        # Only accept valid 4-byte UIDs
+        if uid and len(uid) == 4:
+            uid_str = "".join(f"{b:02X}" for b in uid)
+
+            # Only show NEW cards
+            if uid_str != last_uid:
+                last_uid = uid_str
+                tprint(PRINTSTATUS.INFO, f"RFID READ: {uid_str}")
+                print(f"--- CARD DETECTED --- UID: {uid_str}")
+
+        time.sleep_ms(200)
