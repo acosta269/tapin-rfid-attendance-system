@@ -1,6 +1,6 @@
 ## firmware boot.py
 
-## imports
+## Imports
 import machine
 import network
 import ntptime
@@ -16,7 +16,7 @@ from configs.config import *
 from configs.network_config import *
 
 
-## classes
+## Classes
 class PRINTSTATUS:
     """Status codes for logging messages"""
     
@@ -28,7 +28,7 @@ class PRINTSTATUS:
     DEBUG = "DBG"
 
 
-## call functions
+## Call functions
 def get_date_string() -> str:
     """Return current date as YYYY_MM_DD."""
     
@@ -82,7 +82,7 @@ def eprint(printstatus: str, message: str) -> None:
     return None
 
 
-## procedural functions
+## Procedural functions
 def startup_logo():
     logo = r"""
                       $$\                     
@@ -274,7 +274,7 @@ def fail_safe():
     # buzzer
     
 
-## main process loop
+## Main process loop
 def process() -> None:
     """Boot process: WiFi, updates, run main.py with retry on error."""
     
