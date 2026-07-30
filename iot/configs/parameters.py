@@ -37,3 +37,4 @@ REQUEST_DATA = None                         # received data
 COUNTER = 0                                 # loop counter
 MAIN_LOOP = 0                               # main loop counter
 MAX_LOOP = 100                              # max loops before restart
+PING_INTERVAL = 30000                       # 30 seconds
