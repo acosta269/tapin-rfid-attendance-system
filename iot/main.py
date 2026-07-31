@@ -31,7 +31,7 @@ class MFRC522:
 
     def _read(self, reg):
         self.cs.value(0)
-        self.spi.write(bytes([((reg << 1) & 0x7E) | 0x80]))
+        self.spi.write(bytes([(reg << 1) & 0x80]))
         v = self.spi.read(1)[0]
         self.cs.value(1)
         return v
@@ -192,67 +192,53 @@ def fetch_data():
 
 ## Main function
 def main():
-    """
-    # Initialize hardware
-    rfid = MFRC522()
-    tprint(PRINTSTATUS.INFO, "Checking RFID reader...")
-
-    # Self-check
-    reader_ok = False
-    for _ in range(5):
-        if rfid.request():
-            reader_ok = True
-            break
-        time.sleep_ms(100)
-
-    if not reader_ok:
-        tprint(PRINTSTATUS.ERROR, "RFID reader NOT DETECTED! Check wiring/pins.")
-        while True:
-            time.sleep_ms(1000)
-    else:
-        tprint(PRINTSTATUS.SUCCESS, "RFID reader OK - Ready for cards")
+    tprint(PRINTSTATUS.INFO, "TEST MODE: Sending simulated RFID")
 
     last_rfid = None
     last_ping = time.ticks_ms()
-    """
+    last_test = time.ticks_ms()
 
-    # Main loop
+    # --- MAIN LOOP ---
     while True:
-        # Check ping FIRST before reading RFID
-        if time.ticks_diff(time.ticks_ms(), last_ping) >= PING_INTERVAL:
+        # 1. Send ping first
+        if time.ticks_diff(time.ticks_ms(), last_ping) >= param.PING_INTERVAL:
             last_ping = time.ticks_ms()
             send_ping()
 
+        # 2. REAL RFID READING DISABLED
         """
-        # Read RFID
+        rfid = MFRC522()
+        tprint(PRINTSTATUS.INFO, "Checking RFID reader...")
+        reader_ok = False
+        for _ in range(5):
+            if rfid.request():
+                reader_ok = True
+                break
+            time.sleep_ms(100)
+        if not reader_ok:
+            tprint(PRINTSTATUS.ERROR, "RFID reader NOT DETECTED!")
+            while True:
+                time.sleep_ms(1000)
+        else:
+            tprint(PRINTSTATUS.SUCCESS, "RFID reader OK")
         uid = rfid.get_uid()
         if uid and len(uid) == 4:
             rfid_str = "".join(f"{b:02X}" for b in uid)
             if rfid_str != last_rfid:
                 last_rfid = rfid_str
-                tprint(PRINTSTATUS.INFO, f"RFID READ: {rfid_str}")
                 print(f"--- CARD DETECTED --- RFID: {rfid_str}")
+                post_data({"rfid": rfid_str})
         """
 
-        if time.ticks_diff(time.ticks_ms(), last_test) >= TEST_INTERVAL:
+        # 3. TEST MODE: Generate & send random RFID every TEST_INTERVAL
+        if time.ticks_diff(time.ticks_ms(), last_test) >= param.TEST_INTERVAL:
             last_test = time.ticks_ms()
-
+            test_rfid = "".join(f"{urandom.getrandbits(8):02X}" for _ in range(4))
             if test_rfid != last_rfid:
                 last_rfid = test_rfid
                 print(f"--- TEST SEND --- RFID: {test_rfid}")
-                success = post_data({"rfid_id": test_rfid})
+                success = post_data({"rfid": test_rfid})
                 if success:
                     tprint(PRINTSTATUS.SUCCESS, f"Sent OK: {test_rfid}")
-                # delay ONLY inside this if block
-                time.sleep_ms(200)
-        
-        test_rfid = "".join(f"{urandom.getrandbits(8):02X}" for _ in range(4))
-        if test_rfid:
-            last_rfid = test_rfid
-            print(f"--- TEST SEND --- RFID: {test_rfid}")
-            success = post_data({"rfid_id": test_rfid})
-            if success:
-                tprint(PRINTSTATUS.SUCCESS, f"Sent OK: {test_rfid}")
-            time.sleep_ms(5000)  # 5 second delay after send
 
         time.sleep_ms(200)

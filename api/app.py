@@ -5,13 +5,11 @@ import json
 import requests
 import threading
 
-
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from datetime import datetime, timedelta
 
 ## Variables
 app = Flask(__name__)
-
 
 ## Temporary variables
 device_status = {}
@@ -32,12 +30,11 @@ latest_employee = {
 }
 
 latest_scan = {
-    "rfid_id": None,
+    "rfid": None,
     "scanned_at": None
 }
 
 ## Functions
-
 
 ## Routes
 # Device ping route
@@ -61,7 +58,6 @@ def device_ping():
             "device_id": device_id,
             "last_seen": now
         }), 200
-
     except Exception as e:
         return jsonify({
             "status": "error",
@@ -104,7 +100,6 @@ def register_employee():
             "message": "Employee registered successfully",
             "data": latest_employee
         }), 200
-
     except Exception as e:
         return jsonify({
             "status": "error",
@@ -116,36 +111,35 @@ def register_employee():
 def receive_rfid():
     try:
         data = request.get_json()
-        if not data or "rfid_id" not in data:
+        if not data or "rfid" not in data:
             return jsonify({
                 "status": "error",
-                "message": "Missing 'rfid_id' in request body"
+                "message": "Missing 'rfid' in request body"
             }), 400
 
-        rfid_id = str(data["rfid_id"]).strip()
-        if not rfid_id:
+        rfid = str(data["rfid"]).strip()
+        if not rfid:
             return jsonify({
                 "status": "error",
-                "message": "rfid_id cannot be empty"
+                "message": "rfid cannot be empty"
             }), 400
 
-        latest_scan["rfid_id"] = rfid_id
+        latest_scan["rfid"] = rfid
         latest_scan["scanned_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        print("Received RFID:", rfid_id)
+        print("Received RFID:", rfid)
         return jsonify({
             "status": "success",
-            "message": "RFID ID received",
+            "message": "RFID received",
             "data": latest_scan
         }), 200
-
     except Exception as e:
         return jsonify({
             "status": "error",
             "message": f"Server error: {str(e)}"
         }), 500
 
-# Device status
+# Device status check route
 @app.route("/api/check-device/<device_id>", methods=["GET"])
 def check_device(device_id):
     data = device_status.get(device_id)
@@ -172,13 +166,17 @@ def get_latest_rfid():
         "data": latest_scan
     }), 200
 
-## Error Handling
+# Error Handling
 @app.errorhandler(404)
 def page_not_found(e):
     timestamp = datetime.now().isoformat()
-    return Response.error('Invalid request', '', timestamp)
+    return jsonify({
+        "status": "error",
+        "message": "Invalid request",
+        "timestamp": timestamp
+    }), 404
 
 ## Main
 if __name__ == '__main__':
-    app.run()  # Run the app
-    #app.run(debug=True,port=5001)  # for debug
+    app.run()
+    #app.run(debug=True, port=5001)

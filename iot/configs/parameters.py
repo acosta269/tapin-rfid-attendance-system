@@ -38,3 +38,4 @@ COUNTER = 0                                 # loop counter
 MAIN_LOOP = 0                               # main loop counter
 MAX_LOOP = 100                              # max loops before restart
 PING_INTERVAL = 30000                       # 30 seconds
+TEST_INTERVAL = 10000                       # 10 seconds
