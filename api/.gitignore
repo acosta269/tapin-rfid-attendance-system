@@ -1,0 +1,32 @@
+# Secrets and credentials
+.env
+.env.*
+*.ini
+*.key
+config.py
+db_config.py
+credentials.py
+
+# Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Database and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Editor and system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -37,6 +37,134 @@ latest_scan = {
 ## Functions
 
 ## Routes
+## Web routes
+# Employee registration route
+@app.route("/api/register-employee", methods=["POST"])
+def register_employee():
+    try:
+        from werkzeug.security import generate_password_hash
+
+        data = request.get_json()
+
+        required = ["employeeid", "rfid", "lastname", "firstname", "address", "bdate", "cpnumber", "email", "username", "password"]
+        if not data or not all(key in data for key in required):
+            return jsonify({
+                "status": "error",
+                "message": "Missing required fields",
+                "required_fields": required
+            }), 400
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        latest_employee["uid"] = data.get("rfid")
+        latest_employee["employeeid"] = str(data.get("employeeid", "")).strip()
+        latest_employee["rfid"] = str(data.get("rfid", "")).strip()
+        latest_employee["lastname"] = str(data.get("lastname", "")).strip()
+        latest_employee["firstname"] = str(data.get("firstname", "")).strip()
+        latest_employee["address"] = str(data.get("address", "")).strip()
+        latest_employee["bdate"] = str(data.get("bdate", "")).strip()
+        latest_employee["cpnumber"] = str(data.get("cpnumber", "")).strip()
+        latest_employee["email"] = str(data.get("email", "")).strip()
+        latest_employee["username"] = str(data.get("username", "")).strip()
+        latest_employee["password_hash"] = generate_password_hash(str(data.get("password", "")))
+        latest_employee["image"] = data.get("image")
+        latest_employee["timestamp_creation"] = now
+        latest_employee["timestamp_modified"] = now
+
+        print("Registered:", latest_employee['firstname'], latest_employee['lastname'], 
+              "Username:", latest_employee['username'], "RFID:", latest_employee['rfid'])
+
+        return jsonify({
+            "status": "success",
+            "message": "Employee registered successfully",
+            "data": latest_employee
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Registration failed: " + str(e)
+        }), 500
+
+# Unified Login for Admin, HR, and Employees
+@app.route("/api/login", methods=["POST"])
+def login():
+    try:
+        data = request.get_json()
+        required = ["username", "password"]
+        if not data or not all(key in data for key in required):
+            return jsonify({
+                "status": "error",
+                "message": "Missing username or password"
+            }), 400
+
+        username = str(data["username"]).strip()
+        password = str(data["password"]).strip()
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({
+                "status": "error",
+                "message": "Database connection failed"
+            }), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, username, fullname, role, rfid FROM users WHERE username = %s AND password = %s LIMIT 1", (username, password))
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if user:
+            return jsonify({
+                "status": "success",
+                "message": "Login successful",
+                "user": {
+                    "id": user["id"],
+                    "username": user["username"],
+                    "fullname": user["fullname"],
+                    "role": user["role"],
+                    "rfid": user.get("rfid")
+                }
+            }), 200
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Invalid username or password"
+            }), 401
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+# Device status check route
+@app.route("/api/check-device/<device_id>", methods=["GET"])
+def check_device(device_id):
+    data = device_status.get(device_id)
+    if not data:
+        return jsonify({
+            "status": "unknown",
+            "message": "Device not found"
+        }), 404
+
+    return jsonify({
+        "status": "success",
+        "device_id": device_id,
+        "device_status": data["status"],
+        "last_seen": data["last_seen"]
+    }), 200
+
+# Fetch latest RFID route
+@app.route("/api/get-latest-rfid", methods=["GET"])
+def get_latest_rfid():
+    return jsonify({
+        "status": "success",
+        "rfid": latest_scan["rfid"],
+        "scanned_at": latest_scan["scanned_at"],
+        "data": latest_scan
+    }), 200
+
+## IoT routes
 # Device ping route
 @app.route("/api/device-ping", methods=["POST"])
 def device_ping():
@@ -62,48 +190,6 @@ def device_ping():
         return jsonify({
             "status": "error",
             "message": str(e)
-        }), 500
-
-# Employee registration route
-@app.route("/api/register-employee", methods=["POST"])
-def register_employee():
-    try:
-        data = request.get_json()
-
-        required = ["employeeid", "rfid", "lastname", "firstname", "address", "bdate", "cpnumber", "email"]
-        if not data or not all(key in data for key in required):
-            return jsonify({
-                "status": "error",
-                "message": "Missing required fields",
-                "required_fields": required
-            }), 400
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        latest_employee["uid"] = data.get("rfid")
-        latest_employee["employeeid"] = str(data.get("employeeid", "")).strip()
-        latest_employee["rfid"] = str(data.get("rfid", "")).strip()
-        latest_employee["lastname"] = str(data.get("lastname", "")).strip()
-        latest_employee["firstname"] = str(data.get("firstname", "")).strip()
-        latest_employee["address"] = str(data.get("address", "")).strip()
-        latest_employee["bdate"] = str(data.get("bdate", "")).strip()
-        latest_employee["cpnumber"] = str(data.get("cpnumber", "")).strip()
-        latest_employee["email"] = str(data.get("email", "")).strip()
-        latest_employee["image"] = data.get("image")
-        latest_employee["timestamp_creation"] = now
-        latest_employee["timestamp_modified"] = now
-
-        print("Registered:", latest_employee['firstname'], latest_employee['lastname'], "RFID:", latest_employee['rfid'])
-
-        return jsonify({
-            "status": "success",
-            "message": "Employee registered successfully",
-            "data": latest_employee
-        }), 200
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": "Registration failed: " + str(e)
         }), 500
 
 # RFID receiving route
@@ -138,33 +224,6 @@ def receive_rfid():
             "status": "error",
             "message": f"Server error: {str(e)}"
         }), 500
-
-# Device status check route
-@app.route("/api/check-device/<device_id>", methods=["GET"])
-def check_device(device_id):
-    data = device_status.get(device_id)
-    if not data:
-        return jsonify({
-            "status": "unknown",
-            "message": "Device not found"
-        }), 404
-
-    return jsonify({
-        "status": "success",
-        "device_id": device_id,
-        "device_status": data["status"],
-        "last_seen": data["last_seen"]
-    }), 200
-
-# Fetch latest RFID route
-@app.route("/api/get-latest-rfid", methods=["GET"])
-def get_latest_rfid():
-    return jsonify({
-        "status": "success",
-        "rfid": latest_scan["rfid"],
-        "scanned_at": latest_scan["scanned_at"],
-        "data": latest_scan
-    }), 200
 
 # Error Handling
 @app.errorhandler(404)
