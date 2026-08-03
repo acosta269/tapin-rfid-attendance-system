@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFID Attendance System · Login</title>
+<link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+
+  <main class="login-wrap">
+    <div class="login-card">
+
+      <div class="logo-area">
+        <h1>RFID Attendance System</h1>
+      </div>
+
+      <form id="loginForm" novalidate>
+
+        <label class="field">
+          <span class="field-label">Username</span>
+          <input type="text" name="username" id="username" placeholder="Enter your username" autocomplete="username" required>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input type="password" name="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+        </label>
+
+        <div class="row-between">
+          <label class="checkbox">
+            <input type="checkbox" name="remember">
+            <span>Remember me</span>
+          </label>
+          <a href="#" class="link-muted">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn-primary">Sign In</button>
+
+        <p class="form-message" id="formMessage" role="status" aria-live="polite"></p>
+
+      </form>
+
+      <p class="footnote">
+        Having trouble logging in? Contact your system administrator.
+      </p>
+
+    </div>
+  </main>
+
+<!-- Local JS -->
+<script src="js/login.js"></script>
+</body>
+</html>
