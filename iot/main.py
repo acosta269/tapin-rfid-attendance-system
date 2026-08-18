@@ -27,9 +27,14 @@ def send_ping():
     except Exception as e:
         tprint(PRINTSTATUS.ERROR, "Ping failed: " + str(e))
 
-def post_data(data):
+def post_data(rfid_str):
     url = API_URL + "/api/receive-rfid"
     headers = {"Content-Type": "application/json"}
+    scanned_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    data = {
+        "rfid": rfid_str,
+        "scanned_at": scanned_time
+    }
     try:
         r = requests.post(url, json=data, headers=headers, timeout=10)
         r.close()
