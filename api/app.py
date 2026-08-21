@@ -16,6 +16,12 @@ app.permanent_session_lifetime = timedelta(hours=3)
 USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json")
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
+# Choose the frontend destination from the role stored in users.json.
+ROLE_DASHBOARDS = {
+    "admin": WEB_DASHBOARD,
+    "hr": WEB_DASHBOARD,
+    "employee": WEB_DASHBOARD,
+}
 # Assign separate UID ranges to each user role.
 ROLE_UID_RANGES = {"admin": (1, 9), "hr": (10, 19), "employee": (20, float("inf"))}
 # Remove devices that have not sent a heartbeat within this period.
@@ -61,6 +67,8 @@ latest_scan = {
     "rfid": None,
     "scanned_at": None
 }
+# Keep today's scan events available for dashboard totals.
+scan_events = []
 
 ## Functions
 # Build the RFID lookup database from all user roles.
@@ -109,6 +117,91 @@ def get_online_devices():
         }
         for device_id, data in device_status.items()
     ]
+
+# Calculate live attendance totals from today's recognized RFID scans.
+def get_dashboard_statistics():
+    today = datetime.now().date()
+    today_events = [event for event in scan_events if event["scanned_on"] == today]
+    employee_rfids = {
+        emp.get("rfid", "").strip().upper()
+        for emp in employee_database.values()
+        if emp.get("role") == "employee"
+    }
+    present_rfids = {
+        event["rfid"] for event in today_events
+        if event["rfid"] in employee_rfids
+    }
+    total_employees = len(employee_rfids)
+    present_today = len(present_rfids)
+    absent_today = max(total_employees - present_today, 0)
+    attendance_rate = round((present_today / total_employees) * 100, 1) if total_employees else 0
+
+    return {
+        "total_employees": total_employees,
+        "present_today": present_today,
+        "absent_today": absent_today,
+        "employees_late": 0,
+        "on_leave": 0,
+        "attendance_rate": attendance_rate,
+        "rfid_scans_today": len(today_events),
+        "departments": 0,
+    }
+
+# Prepare recent scans and user records for the dashboard UI.
+def get_dashboard_data():
+    recent_scans = []
+    for event in reversed(scan_events[-50:]):
+        employee = employee_database.get(event["rfid"])
+        recent_scans.append({
+            "rfid": event["rfid"],
+            "scanned_at": event["scanned_at"],
+            "found": bool(employee),
+            "employee": {
+                "uid": employee.get("uid"),
+                "employeeid": employee.get("employeeid"),
+                "lastname": employee.get("lastname"),
+                "firstname": employee.get("firstname"),
+                "role": employee.get("role"),
+                "image": employee.get("image")
+            } if employee else None
+        })
+
+    users = [
+        {
+            "uid": employee.get("uid"),
+            "rfid": employee.get("rfid"),
+            "employeeid": employee.get("employeeid"),
+            "lastname": employee.get("lastname"),
+            "firstname": employee.get("firstname"),
+            "address": employee.get("address"),
+            "bdate": employee.get("bdate"),
+            "cpnumber": employee.get("cpnumber"),
+            "email": employee.get("email"),
+            "username": employee.get("username"),
+            "role": employee.get("role"),
+            "image": employee.get("image"),
+            "timestamp_creation": employee.get("timestamp_creation"),
+            "timestamp_modified": employee.get("timestamp_modified")
+        }
+        for employee in employee_database.values()
+    ]
+    return {
+        "stats": get_dashboard_statistics(),
+        "users": users,
+        "scans": recent_scans,
+        "devices": get_online_devices(),
+        "latest_scan": recent_scans[0] if recent_scans else None
+    }
+
+# Return only the supported role from a user record.
+def get_user_role(user):
+    role = str(user.get("role", "employee")).strip().lower()
+    return role if role in ROLE_DASHBOARDS else "employee"
+
+# Build the frontend destination for the authenticated role.
+def get_role_redirect(role):
+    section = "admin-dashboard" if role in ["admin", "hr"] else "dashboard"
+    return ROLE_DASHBOARDS[role] + "#" + section
 
 ## Routes
 # Register a new admin, HR, or employee account.
@@ -228,7 +321,7 @@ def login():
             if emp.get("username") == username:
                 if password_hash == emp.get("password_hash", "").lower():
                     # Admin and HR use the command center; employees use the main dashboard.
-                    role = emp.get("role", "employee")
+                    role = get_user_role(emp)
                     session.permanent = True
                     session["user"] = {
                         "uid": emp.get("uid"),
@@ -241,7 +334,7 @@ def login():
                     return jsonify({
                         "status": "success",
                         "message": "Login successful",
-                        "redirect": WEB_DASHBOARD + ("#admin-dashboard" if role in ["admin", "hr"] else "#dashboard"),
+                        "redirect": get_role_redirect(role),
                         "user": {
                             "uid": emp.get("uid"),
                             "employeeid": emp.get("employeeid"),
@@ -314,6 +407,27 @@ def get_device_status():
     return jsonify({
         "status": "success",
         "devices": get_online_devices()
+    }), 200
+
+# Return live employee and RFID totals for the dashboard cards.
+@app.route("/api/dashboard-stats", methods=["GET"])
+def dashboard_stats():
+    return jsonify({
+        "status": "success",
+        "stats": get_dashboard_statistics()
+    }), 200
+
+# Return all current dashboard data in one authenticated response.
+@app.route("/api/dashboard-data", methods=["GET"])
+def dashboard_data():
+    if not session.get("user"):
+        return jsonify({
+            "status": "error",
+            "message": "Session expired or user is not logged in"
+        }), 401
+    return jsonify({
+        "status": "success",
+        "data": get_dashboard_data()
     }), 200
 
 # API routes
@@ -393,6 +507,11 @@ def receive_rfid():
 
         latest_scan["rfid"] = rfid
         latest_scan["scanned_at"] = scanned_at
+        scan_events.append({
+            "rfid": rfid,
+            "scanned_at": scanned_at,
+            "scanned_on": datetime.now().date()
+        })
 
         employee = employee_database.get(rfid)
 

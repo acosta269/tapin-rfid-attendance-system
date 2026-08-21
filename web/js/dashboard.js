@@ -40,9 +40,76 @@ function updateClock() {
     });
 }
 
+function updateDashboardStatistics(stats) {
+    const values = {
+        statTotalEmployees: stats.total_employees,
+        statPresentToday: stats.present_today,
+        statAbsentToday: stats.absent_today,
+        statEmployeesLate: stats.employees_late,
+        statOnLeave: stats.on_leave,
+        statAttendanceRate: `${stats.attendance_rate}%`,
+        statRfidScans: stats.rfid_scans_today,
+        statDepartments: stats.departments
+    };
+    Object.entries(values).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    });
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[character]));
+}
+
+function initials(user) {
+    return `${user.firstname || ''} ${user.lastname || ''}`.trim().split(/\s+/).map((part) => part[0] || '').join('').slice(0, 2).toUpperCase() || '--';
+}
+
+function updateEmployeeTable(users) {
+    const body = document.getElementById('dashboardEmployeeBody');
+    if (!body) return;
+    body.innerHTML = users.map((user) => `<tr>
+        <td><div class="emp-avatar" style="width:32px;height:32px;font-size:11px;">${escapeHtml(initials(user))}</div></td>
+        <td><strong>${escapeHtml(user.employeeid || user.uid || '--')}</strong></td>
+        <td><div class="emp-name">${escapeHtml(`${user.firstname || ''} ${user.lastname || ''}`.trim())}</div></td>
+        <td>${escapeHtml(user.role || 'employee')}</td>
+        <td>--</td>
+        <td>${escapeHtml(user.email || '--')}</td>
+        <td><span class="badge badge-approved">Registered</span></td>
+        <td>--</td>
+        <td><div class="table-actions"><button class="action-btn" title="View"><i class="fa-solid fa-eye"></i></button></div></td>
+    </tr>`).join('') || '<tr><td colspan="9">No users registered.</td></tr>';
+}
+
+function updateScanTable(scans) {
+    const body = document.getElementById('dashboardScanBody');
+    if (!body) return;
+    body.innerHTML = scans.slice(0, 10).map((scan) => {
+        const employee = scan.employee;
+        const name = employee ? `${employee.firstname || ''} ${employee.lastname || ''}`.trim() : 'Unknown card';
+        return `<tr>
+            <td><div class="emp-cell"><div class="emp-avatar">${escapeHtml(employee ? initials(employee) : '--')}</div><div><div class="emp-name">${escapeHtml(name)}</div><div class="emp-id">${escapeHtml(scan.rfid)}</div></div></div></td>
+            <td>${escapeHtml(employee ? employee.role : 'Unregistered')}</td><td>${escapeHtml(scan.scanned_at)}</td><td>--</td>
+            <td><span class="badge ${employee ? 'badge-present' : 'badge-absent'}"><span class="badge-dot"></span>${employee ? 'Recognized' : 'Unknown'}</span></td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5">No RFID scans received today.</td></tr>';
+}
+
+function updateAttendanceTable(scans) {
+    const body = document.getElementById('dashboardAttendanceBody');
+    if (!body) return;
+    body.innerHTML = scans.slice(0, 20).map((scan) => {
+        const employee = scan.employee;
+        const name = employee ? `${employee.firstname || ''} ${employee.lastname || ''}`.trim() : 'Unknown card';
+        return `<tr><td><strong>${escapeHtml(employee ? employee.employeeid || employee.uid : '--')}</strong></td><td>${escapeHtml(name)}</td><td>${escapeHtml(employee ? employee.role : 'Unregistered')}</td><td>--</td><td><code>${escapeHtml(scan.rfid)}</code></td><td>${escapeHtml(scan.scanned_at)}</td><td>--</td><td><span class="badge ${employee ? 'badge-present' : 'badge-absent'}"><span class="badge-dot"></span>${employee ? 'Present' : 'Unknown'}</span></td><td>RFID device</td><td>Live scan</td></tr>`;
+    }).join('') || '<tr><td colspan="10">No RFID scans received.</td></tr>';
+}
+
 async function loadDashboardData() {
     try {
-        const response = await fetch(`${dashboardApiBaseUrl}/api/get-latest-rfid`, {
+        const response = await fetch(`${dashboardApiBaseUrl}/api/dashboard-data`, {
             credentials: 'include',
             cache: 'no-store'
         });
@@ -52,13 +119,19 @@ async function loadDashboardData() {
         }
         if (!response.ok) throw new Error('Dashboard data unavailable');
 
-        const data = await response.json();
+        const result = await response.json();
+        const data = result.data || {};
+        updateDashboardStatistics(data.stats || {});
+        updateEmployeeTable(data.users || []);
+        updateScanTable(data.scans || []);
+        updateAttendanceTable(data.scans || []);
         updateDeviceDisplay(data.devices || []);
 
         const latestScanTime = document.getElementById('latestScanTime');
         if (latestScanTime) {
-            latestScanTime.textContent = data.scanned_at
-                ? `${data.scanned_at}${data.employee ? ` - ${data.employee.firstname} ${data.employee.lastname}` : ''}`
+            const latest = data.latest_scan;
+            latestScanTime.textContent = latest
+                ? `${latest.scanned_at}${latest.employee ? ` - ${latest.employee.firstname} ${latest.employee.lastname}` : ''}`
                 : 'No scan received';
         }
     } catch (error) {

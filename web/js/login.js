@@ -58,7 +58,8 @@ try {
     } else {
         localStorage.removeItem('tapinRememberedUsername');
     }
-    window.location.href = result.redirect;
+    const dashboardUrl = new URL(result.redirect, window.location.origin);
+    window.location.replace(dashboardUrl.href);
 } catch (error) {
     message.textContent = error.message || 'Unable to connect to the server.';
     message.className = 'form-message error';
