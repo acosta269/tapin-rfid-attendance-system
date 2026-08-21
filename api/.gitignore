@@ -32,5 +32,6 @@ dist/
 Thumbs.db
 
 # Storage
+database/
 storage/*
 storage/

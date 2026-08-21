@@ -1,30 +1,17 @@
-/* =========================================================
-    DEMO ONLY — replace this whole block with a real backend call.
-
-    In production:
-    1. Send { username, password } to your server (e.g. POST /api/login).
-    2. Server checks the credentials against the database and looks up
-        the user's role (admin / hr / employee) stored in that record.
-    3. Server responds with the role (or a session token that encodes it).
-    4. Redirect based on the role THE SERVER returned — never trust
-        a role guessed only from the username on the client side.
-
-    The lookup table below just simulates step 2 so you can see the
-    redirect logic working before your backend is ready.
-========================================================= */
-
-const demoUserDirectory = {
-"admin":      { role: "admin",    redirect: "admin-dashboard.html" },
-"jsantos":    { role: "hr",       redirect: "hr-dashboard.html" },
-"hr.manager": { role: "hr",       redirect: "hr-dashboard.html" },
-"emp001":     { role: "employee", redirect: "employee-dashboard.html" },
-"emp002":     { role: "employee", redirect: "employee-dashboard.html" }
-};
-
 const form = document.getElementById('loginForm');
 const message = document.getElementById('formMessage');
+const apiBaseUrl = window.TAPIN_API_URL || 'http://localhost:5000';
+const submitButton = form ? form.querySelector('button[type="submit"]') : null;
+const rememberInput = form ? form.querySelector('input[name="remember"]') : null;
 
-form.addEventListener('submit', (e) => {
+if (form) {
+const rememberedUsername = localStorage.getItem('tapinRememberedUsername');
+if (rememberedUsername) {
+    form.username.value = rememberedUsername;
+    rememberInput.checked = true;
+}
+
+form.addEventListener('submit', async (e) => {
 e.preventDefault();
 const username = form.username.value.trim();
 const pass = form.password.value;
@@ -35,24 +22,34 @@ if (!username || !pass) {
     return;
 }
 
-message.textContent = 'Checking credentials…';
+message.textContent = 'Checking credentials...';
 message.className = 'form-message pending';
+submitButton.disabled = true;
 
-// Simulated lookup delay — this is where your real fetch() call goes.
-setTimeout(() => {
-    const match = demoUserDirectory[username.toLowerCase()];
+try {
+    const response = await fetch(`${apiBaseUrl}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password: pass })
+    });
+    const result = await response.json();
 
-    if (!match) {
-    message.textContent = 'Username not found or password incorrect.';
-    message.className = 'form-message error';
-    return;
+    if (!response.ok || result.status !== 'success') {
+        throw new Error(result.message || 'Username or password is incorrect.');
     }
 
-    message.textContent = `Welcome — signing in as ${match.role}…`;
-    message.className = 'form-message pending';
-
-    setTimeout(() => {
-    window.location.href = match.redirect;
-    }, 700);
-}, 600);
+    localStorage.setItem('tapinUser', JSON.stringify(result.user));
+    if (rememberInput.checked) {
+        localStorage.setItem('tapinRememberedUsername', username);
+    } else {
+        localStorage.removeItem('tapinRememberedUsername');
+    }
+    window.location.href = result.redirect;
+} catch (error) {
+    message.textContent = error.message || 'Unable to connect to the server.';
+    message.className = 'form-message error';
+    submitButton.disabled = false;
+}
 });
+}

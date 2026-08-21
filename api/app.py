@@ -1,31 +1,59 @@
 ## Imports
 import os
 import json
-from flask import Flask, jsonify, request
-from datetime import datetime
+import hashlib
+from flask import Flask, jsonify, request, session
+from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
 
 ## Variables
+# Create the Flask application.
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "tapin-development-secret-key")
+app.permanent_session_lifetime = timedelta(hours=3)
 
-USER_DATA_FILE = "user.json"
+# Store user records in the database folder.
+USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json")
+# Open the shared dashboard after a successful login.
+WEB_DASHBOARD = "/pages/dashboard.html"
+# Assign separate UID ranges to each user role.
+ROLE_UID_RANGES = {"admin": (1, 9), "hr": (10, 19), "employee": (20, float("inf"))}
 
+@app.after_request
+def add_cors_headers(response):
+    origin = request.headers.get("Origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    if request.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+# Track the latest status reported by each RFID device.
 device_status = {}
 
+# Store the latest employee record used by the application.
 latest_employee = {
     "uid": None,
-    "employeeid": None,
     "rfid": None,
+    "employeeid": None,
     "lastname": None,
     "firstname": None,
     "address": None,
     "bdate": None,
     "cpnumber": None,
     "email": None,
+    "username": None,
+    "password_hash": None,
+    "role": None,
     "image": None,
-    "timestamp_modified": None,
-    "timestamp_creation": None
+    "timestamp_creation": None,
+    "timestamp_modified": None
 }
 
+# Store the latest RFID scan received from a device.
 latest_scan = {
     "rfid": None,
     "scanned_at": None
@@ -35,13 +63,13 @@ latest_scan = {
 # Load database from JSON file
 def load_employee_database():
     if not os.path.exists(USER_DATA_FILE):
-        print("File not found: user.json - database is empty")
+        print("File not found: database/users.json - database is empty")
         return {}
     try:
         with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
-        print("Error reading user.json:", str(e))
+        print("Error reading database/users.json:", str(e))
         return {}
 
     db = {}
@@ -50,8 +78,9 @@ def load_employee_database():
             for emp in data[category]:
                 rfid = emp.get("rfid", "").strip().upper()
                 if rfid:
+                    emp["role"] = "employee" if category == "employees" else category
                     db[rfid] = emp
-    print("Loaded", len(db), "employees from user.json")
+        print("Loaded", len(db), "employees from database/users.json")
     return db
 
 employee_database = load_employee_database()
@@ -61,9 +90,8 @@ employee_database = load_employee_database()
 @app.route("/api/register-employee", methods=["POST"])
 def register_employee():
     try:
-        from werkzeug.security import generate_password_hash
-        data = request.get_json()
-        required = ["employeeid", "rfid", "lastname", "firstname", "address", "bdate", "cpnumber", "email", "username", "password"]
+        data = request.form
+        required = ["employeeid", "rfid", "lastname", "firstname", "address", "bdate", "cpnumber", "email", "username", "password", "role"]
         if not data or not all(key in data for key in required):
             return jsonify({
                 "status": "error",
@@ -71,13 +99,58 @@ def register_employee():
                 "required_fields": required
             }), 400
         
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        rfid = str(data.get("rfid", "")).strip().upper()
+        role = str(data.get("role", "employee")).strip().lower()
+        if role not in ["admin", "hr", "employee"]:
+            return jsonify({
+                "status": "error",
+                "message": "Role must be admin, hr, or employee"
+            }), 400
 
-        employee_database[rfid] = {
-            "uid": data.get("employeeid"),
-            "employeeid": str(data.get("employeeid", "")).strip(),
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        category = "employees" if role == "employee" else role
+        image_file = request.files.get("image")
+        image_path = ""
+        if image_file and image_file.filename:
+            extension = os.path.splitext(image_file.filename)[1].lower()
+            if extension not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+                return jsonify({
+                    "status": "error",
+                    "message": "Image must be JPG, JPEG, PNG, GIF, or WEBP"
+                }), 400
+
+        with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
+            database = json.load(f)
+
+        username = str(data.get("username", "")).strip()
+        rfid = str(data.get("rfid", "")).strip().upper()
+        if any(emp.get("rfid", "").strip().upper() == rfid or emp.get("username") == username
+               for records in database.values() for emp in records):
+            return jsonify({
+                "status": "error",
+                "message": "RFID or username is already registered"
+            }), 409
+
+        uid_start, uid_end = ROLE_UID_RANGES[role]
+        employee_uids = [
+            int(emp.get("uid"))
+            for records in database.values()
+            for emp in records
+            if str(emp.get("uid", "")).isdigit()
+        ]
+        role_uids = [value for value in employee_uids if uid_start <= value <= uid_end]
+        uid = str(max([uid_start - 1] + role_uids) + 1).zfill(3)
+
+        if image_file and image_file.filename:
+            employee_id_filename = secure_filename(str(data.get("employeeid", "")))
+            image_directory = os.path.join(os.path.dirname(__file__), "storage", "profiles", category, uid)
+            os.makedirs(image_directory, exist_ok=True)
+            image_file.save(os.path.join(image_directory, employee_id_filename + extension))
+            image_path = os.path.join("storage", "profiles", category, uid, employee_id_filename + extension).replace(os.sep, "/")
+
+        employee = {
+            "uid": uid,
             "rfid": rfid,
+            "employeeid": str(data.get("employeeid", "")).strip(),
             "lastname": str(data.get("lastname", "")).strip(),
             "firstname": str(data.get("firstname", "")).strip(),
             "address": str(data.get("address", "")).strip(),
@@ -85,17 +158,24 @@ def register_employee():
             "cpnumber": str(data.get("cpnumber", "")).strip(),
             "email": str(data.get("email", "")).strip(),
             "username": str(data.get("username", "")).strip(),
-            "password_hash": generate_password_hash(str(data.get("password", ""))),
-            "image": data.get("image", ""),
+            "password_hash": hashlib.md5(str(data.get("password", "")).encode("utf-8")).hexdigest(),
+            "role": role,
+            "image": image_path,
             "timestamp_creation": now,
             "timestamp_modified": now
         }
+        database.setdefault(category, []).append(employee)
+        with open(USER_DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(database, f, indent=4)
+            f.write("\n")
 
-        print("Registered:", employee_database[rfid]["firstname"], employee_database[rfid]["lastname"], "RFID:", rfid)
+        employee_database[rfid] = employee
+
+        print("Registered:", employee["firstname"], employee["lastname"], "UID:", uid, "RFID:", rfid)
         return jsonify({
             "status": "success",
             "message": "Employee registered successfully",
-            "data": employee_database[rfid]
+            "data": employee
         }), 200
     except Exception as e:
         return jsonify({
@@ -107,20 +187,39 @@ def register_employee():
 def login():
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "Username and password are required"
+            }), 400
+
         username = str(data.get("username", "")).strip()
         password = str(data.get("password", "")).strip()
+        password_hash = hashlib.md5(password.encode("utf-8")).hexdigest()
 
-        for rfid, emp in employee_database.items():
+        for emp in employee_database.values():
             if emp.get("username") == username:
-                if password == emp.get("password_hash", ""):
+                if password_hash == emp.get("password_hash", "").lower():
+                    role = emp.get("role", "employee")
+                    session.permanent = True
+                    session["user"] = {
+                        "uid": emp.get("uid"),
+                        "employeeid": emp.get("employeeid"),
+                        "username": emp.get("username"),
+                        "fullname": emp.get("firstname", "") + " " + emp.get("lastname", ""),
+                        "role": role,
+                        "rfid": emp.get("rfid")
+                    }
                     return jsonify({
                         "status": "success",
                         "message": "Login successful",
+                        "redirect": WEB_DASHBOARD + ("#admin-dashboard" if role in ["admin", "hr"] else "#dashboard"),
                         "user": {
+                            "uid": emp.get("uid"),
                             "employeeid": emp.get("employeeid"),
                             "username": emp.get("username"),
                             "fullname": emp.get("firstname", "") + " " + emp.get("lastname", ""),
-                            "role": emp.get("role", "employee"),
+                            "role": role,
                             "rfid": emp.get("rfid")
                         }
                     }), 200
@@ -134,6 +233,27 @@ def login():
             "status": "error",
             "message": str(e)
         }), 500
+
+@app.route("/api/session", methods=["GET"])
+def get_session():
+    user = session.get("user")
+    if not user:
+        return jsonify({
+            "status": "error",
+            "message": "Session expired or user is not logged in"
+        }), 401
+    return jsonify({
+        "status": "success",
+        "user": user
+    }), 200
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({
+        "status": "success",
+        "message": "Logged out successfully"
+    }), 200
 
 # Semi Web Routes
 @app.route("/api/get-latest-rfid", methods=["GET"])
