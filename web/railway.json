@@ -1,0 +1,7 @@
+{
+    "build": {
+        "builder": "NIXPACKS",
+        "buildCommand": "echo 'Building static site...'",
+        "startCommand": "serve -s . -l ${PORT:-3000}"
+    }
+}
