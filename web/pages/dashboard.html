@@ -113,7 +113,7 @@
           <span class="nav-icon"><i class="fa-solid fa-circle-user"></i></span>
           User Profile
         </a>
-        <a href="#" class="nav-item" style="color:#EF4444;">
+        <a href="#" id="tapinLogout" class="nav-item" style="color:#EF4444;">
           <span class="nav-icon" style="color:#EF4444;"><i class="fa-solid fa-right-from-bracket"></i></span>
           Logout
         </a>
@@ -1080,7 +1080,33 @@
           </div>
           <div class="flex gap-2">
             <button class="btn btn-outline"><i class="fa-solid fa-file-excel"></i> Export</button>
-            <button class="btn btn-primary"><i class="fa-solid fa-user-plus"></i> Add Employee</button>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('employeeRegistrationForm').scrollIntoView({ behavior: 'smooth' })"><i class="fa-solid fa-user-plus"></i> Add Employee</button>
+          </div>
+        </div>
+
+        <div class="card mb-6">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-user-plus"></i> Register User</div>
+          </div>
+          <div class="card-body">
+            <form id="employeeRegistrationForm" enctype="multipart/form-data">
+              <div class="grid-2">
+                <div class="form-group"><label for="registrationRole">Role</label><select class="form-control" id="registrationRole" name="role" required><option value="employee">Employee</option><option value="hr">HR</option><option value="admin">Admin</option></select></div>
+                <div class="form-group"><label for="registrationRfid">RFID</label><input class="form-control" id="registrationRfid" name="rfid" required /></div>
+                <div class="form-group"><label for="registrationEmployeeId">Employee ID</label><input class="form-control" id="registrationEmployeeId" name="employeeid" /></div>
+                <div class="form-group"><label for="registrationLastname">Last Name</label><input class="form-control" id="registrationLastname" name="lastname" required /></div>
+                <div class="form-group"><label for="registrationFirstname">First Name</label><input class="form-control" id="registrationFirstname" name="firstname" required /></div>
+                <div class="form-group"><label for="registrationAddress">Address</label><input class="form-control" id="registrationAddress" name="address" required /></div>
+                <div class="form-group"><label for="registrationBdate">Birth Date</label><input class="form-control" id="registrationBdate" name="bdate" type="date" required /></div>
+                <div class="form-group"><label for="registrationCpnumber">CP Number</label><input class="form-control" id="registrationCpnumber" name="cpnumber" required /></div>
+                <div class="form-group"><label for="registrationEmail">Email</label><input class="form-control" id="registrationEmail" name="email" type="email" required /></div>
+                <div class="form-group"><label for="registrationUsername">Username</label><input class="form-control" id="registrationUsername" name="username" autocomplete="username" required /></div>
+                <div class="form-group"><label for="registrationPassword">Password</label><input class="form-control" id="registrationPassword" name="password" type="password" autocomplete="new-password" required /></div>
+                <div class="form-group"><label for="registrationImage">Profile Image</label><input class="form-control" id="registrationImage" name="image" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" /></div>
+              </div>
+              <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Register User</button>
+              <p id="registrationMessage" role="status" aria-live="polite"></p>
+            </form>
           </div>
         </div>
 
@@ -1982,5 +2008,7 @@
   </div><!-- /main -->
 </div><!-- /wrapper -->
 
+<script src="../js/auth.js"></script>
+<script src="../js/registration.js"></script>
 </body>
 </html>
