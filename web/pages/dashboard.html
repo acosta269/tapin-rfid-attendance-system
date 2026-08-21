@@ -9,15 +9,12 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 </head>
 <body>
 
 <div class="wrapper">
 
-  <!-- ======================================================
-       SIDEBAR
-  ====================================================== -->
   <aside class="sidebar">
 
     <div class="sidebar-brand">
@@ -121,14 +118,7 @@
     </div>
 
   </aside>
-  <!-- /SIDEBAR -->
-
-  <!-- ======================================================
-       MAIN
-  ====================================================== -->
   <div class="main">
-
-    <!-- TOPBAR -->
     <header class="topbar">
       <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
@@ -136,8 +126,8 @@
       </div>
 
       <div class="topbar-center">
-        <span class="topbar-date">Tuesday, August 18, 2026</span>
-        <span class="topbar-time">06 : 58 PM</span>
+        <span class="topbar-date" id="dashboardDate">Loading date...</span>
+        <span class="topbar-time" id="dashboardTime">Loading time...</span>
       </div>
 
       <div class="topbar-actions">
@@ -154,22 +144,13 @@
         <div class="admin-chip">
           <div class="admin-avatar">AD</div>
           <div class="admin-info">
-            <div class="admin-name">Admin User</div>
-            <div class="admin-role">HR Officer</div>
+            <div class="admin-name" id="dashboardUserName">Loading user...</div>
+            <div class="admin-role" id="dashboardUserRole">Checking session...</div>
           </div>
         </div>
       </div>
     </header>
-    <!-- /TOPBAR -->
-
-    <!-- ====================================================
-         CONTENT SECTIONS
-    ==================================================== -->
     <div class="content">
-
-      <!-- =====================================================
-           #1 DASHBOARD
-      ===================================================== -->
       <section class="page-section" id="dashboard">
 
         <div class="section-actions">
@@ -466,12 +447,6 @@
         </div><!-- /grid-2 -->
 
       </section>
-      <!-- /#dashboard -->
-
-
-      <!-- =====================================================
-           #2 EMPLOYEES PERSONAL INFO
-      ===================================================== -->
       <section class="page-section" id="employees">
         <div class="section-actions">
           <div>
@@ -637,12 +612,6 @@
 
         </div>
       </section>
-      <!-- /#employees -->
-
-
-      <!-- =====================================================
-           #3 DTR CSC FORM
-      ===================================================== -->
       <section class="page-section" id="dtr">
         <div class="section-actions">
           <div>
@@ -765,12 +734,6 @@
           </div>
         </div>
       </section>
-      <!-- /#dtr -->
-
-
-      <!-- =====================================================
-           #4 HR LETTERS
-      ===================================================== -->
       <section class="page-section" id="hr-letters">
         <div class="section-actions">
           <div>
@@ -869,12 +832,6 @@
           </div>
         </div>
       </section>
-      <!-- /#hr-letters -->
-
-
-      <!-- =====================================================
-           #5 TEMPLATES
-      ===================================================== -->
       <section class="page-section" id="templates">
         <div class="section-actions">
           <div>
@@ -932,12 +889,6 @@
           </div>
         </div>
       </section>
-      <!-- /#templates -->
-
-
-      <!-- =====================================================
-           #6 INTRODUCTION / BACKGROUND
-      ===================================================== -->
       <section class="page-section" id="introduction">
         <div class="section-actions">
           <div>
@@ -989,12 +940,6 @@
           </div>
         </div>
       </section>
-      <!-- /#introduction -->
-
-
-      <!-- =====================================================
-           #7 IOT-BASED ATTENDANCE
-      ===================================================== -->
       <section class="page-section" id="iot-attendance">
         <div class="section-actions">
           <div>
@@ -1061,12 +1006,6 @@
           </div>
         </div>
       </section>
-      <!-- /#iot-attendance -->
-
-
-      <!-- =====================================================
-           #8 EMPLOYEE LIST
-      ===================================================== -->
       <section class="page-section" id="employee-list">
         <div class="section-actions">
           <div>
@@ -1328,12 +1267,6 @@
           </div>
         </div>
       </section>
-      <!-- /#employee-list -->
-
-
-      <!-- =====================================================
-           #9 REPORTS
-      ===================================================== -->
       <section class="page-section" id="reports">
         <div class="section-actions">
           <div>
@@ -1505,12 +1438,6 @@
 
         </div>
       </section>
-      <!-- /#reports -->
-
-
-      <!-- =====================================================
-           #10 REALTIME DASHBOARD EMPLOYEE ATTENDANCE
-      ===================================================== -->
       <section class="page-section" id="realtime">
         <div class="section-actions">
           <div>
@@ -1532,8 +1459,8 @@
           <div class="status-panel">
             <div class="status-panel-title"><i class="fa-solid fa-server" style="color:var(--primary);"></i> System Status</div>
             <div class="status-item">
-              <div class="status-item-label"><div class="status-indicator status-online"></div> RFID Reader</div>
-              <div class="status-text text-online"><i class="fa-solid fa-circle-check"></i> Online</div>
+              <div class="status-item-label"><div id="readerStatusIndicator" class="status-indicator status-offline"></div> RFID Reader</div>
+              <div id="readerStatusText" class="status-text text-offline"><i class="fa-solid fa-circle-xmark"></i> Offline</div>
             </div>
             <div class="status-item">
               <div class="status-item-label"><div class="status-indicator status-online"></div> Database</div>
@@ -1549,7 +1476,7 @@
             </div>
             <div class="status-item">
               <div class="status-item-label" style="color:var(--text-muted);font-size:12px;">Last RFID Scan</div>
-              <div class="status-text" style="color:var(--text-muted);">08:32 AM Today</div>
+              <div id="latestScanTime" class="status-text" style="color:var(--text-muted);">No scan received</div>
             </div>
           </div>
 
@@ -1720,12 +1647,6 @@
           </div>
         </div>
       </section>
-      <!-- /#realtime -->
-
-
-      <!-- =====================================================
-           #11 ADMIN / HR REALTIME DASHBOARD
-      ===================================================== -->
       <section class="page-section" id="admin-dashboard">
         <div class="section-actions">
           <div>
@@ -1893,12 +1814,6 @@
 
         </div>
       </section>
-      <!-- /#admin-dashboard -->
-
-
-      <!-- =====================================================
-           #12 SETTINGS
-      ===================================================== -->
       <section class="page-section" id="settings">
         <div class="section-actions">
           <div>
@@ -1936,12 +1851,6 @@
           </div>
         </div>
       </section>
-      <!-- /#settings -->
-
-
-      <!-- =====================================================
-           #13 USER PROFILE
-      ===================================================== -->
       <section class="page-section" id="profile">
         <div class="section-actions">
           <div>
@@ -1984,14 +1893,7 @@
           </div>
         </div>
       </section>
-      <!-- /#profile -->
-
-
     </div><!-- /content -->
-
-    <!-- ======================================================
-         FOOTER
-    ====================================================== -->
     <footer class="footer">
       <div class="footer-content">
         <div>
@@ -2008,7 +1910,7 @@
   </div><!-- /main -->
 </div><!-- /wrapper -->
 
-<script src="../js/auth.js"></script>
+<script src="../js/dashboard.js"></script>
 <script src="../js/registration.js"></script>
 </body>
 </html>

@@ -1,17 +1,12 @@
-/* ============================================
-   RFID Attendance System — Basic Login
-   Works for Admin, HR, and Employee roles
-   ============================================ */
-
 * { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: 'Segoe UI', Arial, sans-serif;
-  background: #f2f4f7;
-  color: #1f2937;
+  font-family: 'Poppins', sans-serif;
+  background: #eef4f7;
+  color: #17212b;
 }
 
 .login-wrap {
@@ -19,48 +14,60 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 32px 20px;
+  background: linear-gradient(135deg, #e8f4f4 0%, #f8fbfc 52%, #eaf0f8 100%);
 }
 
 .login-card {
   width: 100%;
-  max-width: 380px;
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-  padding: 36px 32px;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(30, 64, 80, 0.14);
+  padding: 42px 40px 34px;
 }
 
 .logo-area {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 30px;
 }
 
 .logo-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 14px;
-  border-radius: 8px;
-  background: #2563eb;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 18px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #0f766e, #155e75);
   color: #fff;
-  font-weight: 700;
-  font-size: 16px;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 1px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.24);
+}
+
+.eyebrow {
+  margin: 0 0 9px;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
 }
 
 .logo-area h1 {
-  font-size: 19px;
-  font-weight: 600;
-  margin: 0 0 4px;
-  color: #111827;
+  font-size: 29px;
+  line-height: 1.15;
+  font-weight: 750;
+  margin: 0 0 8px;
+  color: #17212b;
 }
 
 .subtitle {
-  font-size: 13.5px;
-  color: #6b7280;
+  font-size: 14px;
+  color: #64748b;
   margin: 0;
 }
 
@@ -102,6 +109,39 @@ select:focus {
   background: #fff;
 }
 
+.password-wrap {
+  position: relative;
+  display: block;
+}
+
+.password-wrap input {
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.password-toggle:hover { color: #0f766e; }
+
+.password-toggle:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+
 .row-between {
   display: flex;
   align-items: center;
@@ -136,7 +176,7 @@ select:focus {
 
 .btn-primary {
   width: 100%;
-  background: #2563eb;
+  background: linear-gradient(135deg, #0f766e, #155e75);
   color: #fff;
   border: none;
   border-radius: 7px;
@@ -148,8 +188,12 @@ select:focus {
 }
 
 .btn-primary:hover {
-  background: #1d4ed8;
+  background: linear-gradient(135deg, #115e59, #164e63);
 }
+
+.button-loading { display: none; }
+.is-loading .button-label { display: none; }
+.is-loading .button-loading { display: inline; }
 
 .btn-primary:focus-visible,
 input:focus-visible,
@@ -179,6 +223,8 @@ select:focus-visible,
 
 @media (max-width: 420px) {
   .login-card {
-    padding: 28px 20px;
+    padding: 34px 22px 28px;
   }
+
+  .logo-area h1 { font-size: 25px; }
 }
