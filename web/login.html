@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RFID Attendance System · Login</title>
 <link rel="stylesheet" href="css/login.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -12,7 +16,9 @@
     <div class="login-card">
 
       <div class="logo-area">
-        <h1>RFID Attendance System</h1>
+          <p class="eyebrow">TAPIN · ISPSC TAGUDIN</p>
+          <h1>RFID Attendance System</h1>
+          <p class="subtitle">Sign in to manage attendance securely.</p>
       </div>
 
       <form id="loginForm" novalidate>
@@ -24,7 +30,10 @@
 
         <label class="field">
           <span class="field-label">Password</span>
-          <input type="password" name="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+          <span class="password-wrap">
+            <input type="password" name="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+            <button type="button" class="password-toggle" id="passwordToggle" aria-label="Show password" title="Show password"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+          </span>
         </label>
 
         <div class="row-between">
@@ -35,7 +44,7 @@
           <a href="#" class="link-muted">Forgot password?</a>
         </div>
 
-        <button type="submit" class="btn-primary">Sign In</button>
+        <button type="submit" class="btn-primary"><span class="button-label">Sign In</span><span class="button-loading" aria-hidden="true">Signing in...</span></button>
 
         <p class="form-message" id="formMessage" role="status" aria-live="polite"></p>
 

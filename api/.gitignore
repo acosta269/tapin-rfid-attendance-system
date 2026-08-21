@@ -32,6 +32,8 @@ dist/
 Thumbs.db
 
 # Storage
-database/
+database/*
+!database/
+!database/users.json
 storage/*
 storage/

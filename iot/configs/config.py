@@ -11,6 +11,6 @@ BOOT_URL = "https://raw.githubusercontent.com/lolenseu/tapin-rfid-attendance-sys
 MAIN_URL = "https://raw.githubusercontent.com/lolenseu/tapin-rfid-attendance-system/refs/heads/main/iot/main.py"
 
 ## api url
-API_URL_STORAGE = ""            # pythonanywhere pair pipeline api endpoints
-API_URL = ""                    
+API_URL_STORAGE = ""            # separate storage API endpoint is not used
+API_URL = "https://tapin-api.up.railway.app/"
  

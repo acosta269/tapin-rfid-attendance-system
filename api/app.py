@@ -18,7 +18,10 @@ USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json
 WEB_DASHBOARD = "/pages/dashboard.html"
 # Assign separate UID ranges to each user role.
 ROLE_UID_RANGES = {"admin": (1, 9), "hr": (10, 19), "employee": (20, float("inf"))}
+# Remove devices that have not sent a heartbeat within this period.
+DEVICE_TIMEOUT_SECONDS = 90
 
+# Add CORS and no-cache headers to API responses.
 @app.after_request
 def add_cors_headers(response):
     origin = request.headers.get("Origin")
@@ -60,7 +63,7 @@ latest_scan = {
 }
 
 ## Functions
-# Load database from JSON file
+# Build the RFID lookup database from all user roles.
 def load_employee_database():
     if not os.path.exists(USER_DATA_FILE):
         print("File not found: database/users.json - database is empty")
@@ -85,8 +88,30 @@ def load_employee_database():
 
 employee_database = load_employee_database()
 
+# Delete devices that have stopped sending heartbeat pings.
+def remove_offline_devices():
+    current_time = datetime.now()
+    offline_devices = [
+        device_id for device_id, data in device_status.items()
+        if (current_time - data["last_seen_at"]).total_seconds() > DEVICE_TIMEOUT_SECONDS
+    ]
+    for device_id in offline_devices:
+        del device_status[device_id]
+
+# Get the current online device list for web display.
+def get_online_devices():
+    remove_offline_devices()
+    return [
+        {
+            "device_id": device_id,
+            "status": data["status"],
+            "last_seen": data["last_seen"],
+        }
+        for device_id, data in device_status.items()
+    ]
+
 ## Routes
-# Web Routes
+# Register a new admin, HR, or employee account.
 @app.route("/api/register-employee", methods=["POST"])
 def register_employee():
     try:
@@ -99,6 +124,7 @@ def register_employee():
                 "required_fields": required
             }), 400
         
+        # Store the account in the database section selected by its role.
         role = str(data.get("role", "employee")).strip().lower()
         if role not in ["admin", "hr", "employee"]:
             return jsonify({
@@ -183,6 +209,7 @@ def register_employee():
             "message": "Registration failed: " + str(e)
         }), 500
 
+# Authenticate all roles and create a three-hour session.
 @app.route("/api/login", methods=["POST"])
 def login():
     try:
@@ -200,6 +227,7 @@ def login():
         for emp in employee_database.values():
             if emp.get("username") == username:
                 if password_hash == emp.get("password_hash", "").lower():
+                    # Admin and HR use the command center; employees use the main dashboard.
                     role = emp.get("role", "employee")
                     session.permanent = True
                     session["user"] = {
@@ -234,6 +262,7 @@ def login():
             "message": str(e)
         }), 500
 
+# Return the currently authenticated user's session.
 @app.route("/api/session", methods=["GET"])
 def get_session():
     user = session.get("user")
@@ -247,6 +276,7 @@ def get_session():
         "user": user
     }), 200
 
+# Clear the authenticated user's session.
 @app.route("/api/logout", methods=["POST"])
 def logout():
     session.clear()
@@ -256,6 +286,7 @@ def logout():
     }), 200
 
 # Semi Web Routes
+# Return the latest RFID scan and online devices for the web dashboard.
 @app.route("/api/get-latest-rfid", methods=["GET"])
 def get_latest_rfid():
     rfid = latest_scan.get("rfid")
@@ -266,6 +297,7 @@ def get_latest_rfid():
         "status": "success",
         "rfid": rfid,
         "scanned_at": scanned_at,
+        "devices": get_online_devices(),
         "found": bool(employee),
         "employee": {
             "employeeid": employee.get("employeeid"),
@@ -275,9 +307,20 @@ def get_latest_rfid():
         } if employee else None
     }), 200
 
+# Web display route for current device heartbeats.
+# Return devices that have sent a recent ping.
+@app.route("/api/get-device-status", methods=["GET"])
+def get_device_status():
+    return jsonify({
+        "status": "success",
+        "devices": get_online_devices()
+    }), 200
+
 # API routes
+# Check whether one device is currently online.
 @app.route("/api/check-device/<device_id>", methods=["GET"])
 def check_device(device_id):
+    remove_offline_devices()
     data = device_status.get(device_id)
     if not data:
         return jsonify({
@@ -291,6 +334,7 @@ def check_device(device_id):
         "last_seen": data["last_seen"]
     }), 200
 
+# Reload users.json into the in-memory RFID lookup database.
 @app.route("/api/reload-db", methods=["POST"])
 def reload_db():
     global employee_database
@@ -302,16 +346,23 @@ def reload_db():
     }), 200
 
 # IoT Routes
+# Receive a heartbeat ping from an RFID device.
 @app.route("/api/device-ping", methods=["POST"])
 def device_ping():
     try:
         data = request.get_json()
-        device_id = data.get("device_id", "unknown")
+        if not data or not data.get("device_id"):
+            return jsonify({
+                "status": "error",
+                "message": "Missing required field: device_id"
+            }), 400
+        device_id = str(data["device_id"]).strip()
         status = data.get("status", "alive")
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         device_status[device_id] = {
             "status": status,
-            "last_seen": now
+            "last_seen": now,
+            "last_seen_at": datetime.now()
         }
         print("Ping received from", device_id, "Last seen:", now)
         return jsonify({
@@ -326,6 +377,7 @@ def device_ping():
             "message": str(e)
         }), 500
 
+# Receive an RFID scan and match it to a user record.
 @app.route("/api/receive-rfid", methods=["POST"])
 def receive_rfid():
     try:
@@ -368,6 +420,7 @@ def receive_rfid():
         }), 500
 
 # Error Handlers
+# Return a consistent JSON response for unknown routes.
 @app.errorhandler(404)
 def page_not_found(e):
     return jsonify({

@@ -1,4 +1,4 @@
-const authApiBaseUrl = window.TAPIN_API_URL || 'http://localhost:5000';
+const authApiBaseUrl = window.TAPIN_API_URL || 'https://tapin-api.up.railway.app';
 
 function redirectToLogin() {
     localStorage.removeItem('tapinUser');

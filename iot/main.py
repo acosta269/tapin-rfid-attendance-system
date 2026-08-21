@@ -19,16 +19,17 @@ rfid = None
 
 ## Functions
 def send_ping():
-    url = API_URL + "/api/device-ping"
+    url = API_URL.rstrip("/") + "/api/device-ping"
     headers = {"Content-Type": "application/json"}
     try:
-        requests.post(url, json={"device_id": param.DEVICE_ID, "status": "alive"}, headers=headers, timeout=10)
+        response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "alive"}, headers=headers, timeout=10)
+        response.close()
         tprint(PRINTSTATUS.INFO, "Ping sent - Device alive")
     except Exception as e:
         tprint(PRINTSTATUS.ERROR, "Ping failed: " + str(e))
 
 def post_data(rfid_str):
-    url = API_URL + "/api/receive-rfid"
+    url = API_URL.rstrip("/") + "/api/receive-rfid"
     headers = {"Content-Type": "application/json"}
     scanned_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     data = {
@@ -37,8 +38,9 @@ def post_data(rfid_str):
     }
     try:
         r = requests.post(url, json=data, headers=headers, timeout=10)
+        success = r.status_code == 200
         r.close()
-        return r.status_code == 200
+        return success
     except Exception as e:
         tprint(PRINTSTATUS.ERROR, "Send error: " + str(e))
         return False
@@ -212,7 +214,7 @@ def main():
             if rfid_str != last_rfid:
                 last_rfid = rfid_str
                 tprint(PRINTSTATUS.INFO, "RFID: " + rfid_str)
-                post_data({"rfid": rfid_str})
+                post_data(rfid_str)
                 display_str = "RFID:" + rfid_str
                 while len(display_str) < 16:
                     display_str = display_str + " "

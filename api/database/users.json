@@ -1,0 +1,76 @@
+{
+    "admin": [
+        {
+            "uid": "001",
+            "rfid": "FFFFFFFF",
+            "employeeid": "A01-0001",
+            "lastname": "SYSTEM",
+            "firstname": "ADMIN",
+            "address": "Tagudin, Ilocos Sur",
+            "bdate": "2000-01-01",
+            "cpnumber": "09170000001",
+            "email": "admin@tapin-rfid.ph",
+            "username": "admin",
+            "password_hash": "21232f297a57a5a743894a0e4a801fc3",
+            "role": "admin",
+            "image": "storage/profiles/admin/001/admin-profile.jpg",
+            "timestamp_creation": "2026-08-03 15:00:00",
+            "timestamp_modified": "2026-08-03 15:00:00"
+        }
+    ],
+    "hr": [
+        {
+            "uid": "010",
+            "rfid": "11223344",
+            "employeeid": "HR01-0001",
+            "lastname": "REYES",
+            "firstname": "MARIA S.",
+            "address": "Tagudin, Ilocos Sur",
+            "bdate": "1995-09-12",
+            "cpnumber": "09188887777",
+            "email": "hr@tapin-rfid.ph",
+            "username": "hr_maria",
+            "password_hash": "4435a4e88e984616a91c109524caf662",
+            "role": "hr",
+            "image": "storage/profiles/hr/010/maria-reyes.jpg",
+            "timestamp_creation": "2026-08-03 15:10:00",
+            "timestamp_modified": "2026-08-03 15:10:00"
+        }
+    ],
+    "employees": [
+        {
+            "uid": "020",
+            "rfid": "A1B2C3D4",
+            "employeeid": "E22-0001",
+            "lastname": "CRUZ",
+            "firstname": "JUAN A.",
+            "address": "Vigan City, Ilocos Sur",
+            "bdate": "1998-05-10",
+            "cpnumber": "09171112222",
+            "email": "juan.cruz@example.ph",
+            "username": "juan001",
+            "password_hash": "0d58a12a4807c31223d83bde207a8f22",
+            "role": "employee",
+            "image": "storage/profiles/employees/020/juan-cruz.jpg",
+            "timestamp_creation": "2026-08-03 15:20:00",
+            "timestamp_modified": "2026-08-03 15:20:00"
+        },
+        {
+            "uid": "021",
+            "rfid": "93202626",
+            "employeeid": "E22-1005",
+            "lastname": "ACOSTA",
+            "firstname": "MARK D.",
+            "address": "Vigan City, Ilocos Sur",
+            "bdate": "2001-03-26",
+            "cpnumber": "09171234567",
+            "email": "mark.acosta@example.ph",
+            "username": "mark002",
+            "password_hash": "6f3f59b269d9b38e130c887a513a21d5",
+            "role": "employee",
+            "image": "storage/profiles/employees/021/mark-acosta.jpg",
+            "timestamp_creation": "2026-08-03 15:25:00",
+            "timestamp_modified": "2026-08-03 15:25:00"
+        }
+    ]
+}
