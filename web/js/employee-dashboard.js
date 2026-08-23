@@ -1,48 +1,144 @@
-const employeeApiBaseUrl = window.TAPIN_API_URL || 'https://tapin-api.up.railway.app';
+const dashboardApiBaseUrl = window.TAPIN_API_URL || 'https://tapin-api.up.railway.app';
 
-function employeeLoginRedirect() {
+function redirectToLogin() {
     localStorage.removeItem('tapinUser');
     window.location.replace('../login.html');
 }
 
-function setEmployeeText(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.textContent = value || '--';
+function updateUserDisplay(user) {
+    const name = document.getElementById('employeeUserName');
+    const role = document.getElementById('employeeUserRole');
+    const empId = document.getElementById('employeeId');
+    if (name) name.textContent = user.fullname || user.username || 'User';
+    if (role) role.textContent = (user.role || 'employee').toUpperCase();
+    if (empId) empId.textContent = user.employeeid || user.uid || '--';
 }
 
-async function loadEmployeeDashboard() {
+function updateClock() {
+    const now = new Date();
+    const date = document.getElementById('employeeDate');
+    const time = document.getElementById('employeeTime');
+    if (date) date.textContent = now.toLocaleDateString(undefined, {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    if (time) time.textContent = now.toLocaleTimeString(undefined, {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
+    });
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[character]));
+}
+
+function updateAttendanceSummary(records) {
+    const today = new Date().toISOString().split('T')[0];
+    let todayStatus = 'Not logged in';
+    let todayHours = '0.00';
+    
+    for (const record of records) {
+        for (const day of record.working_days || []) {
+            if (day.date === today) {
+                if (day.am_in || day.pm_in) {
+                    todayStatus = 'Present';
+                }
+                todayHours = day.hours || '0.00';
+                break;
+            }
+        }
+    }
+    
+    const statusElement = document.getElementById('todayStatus');
+    const hoursElement = document.getElementById('todayHours');
+    if (statusElement) statusElement.textContent = todayStatus;
+    if (hoursElement) hoursElement.textContent = `${todayHours} hrs`;
+}
+
+function updateMonthlyAttendance(records) {
+    const body = document.getElementById('employeeAttendanceBody');
+    if (!body) return;
+    
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    let html = '';
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayOfWeek = new Date(currentYear, currentMonth, day).toLocaleDateString(undefined, { weekday: 'short' });
+        let amIn = '--', amOut = '--', pmIn = '--', pmOut = '--', hours = '0.00';
+        
+        for (const record of records) {
+            for (const dayData of record.working_days || []) {
+                if (dayData.date === dateStr) {
+                    amIn = dayData.am_in || '--';
+                    amOut = dayData.am_out || '--';
+                    pmIn = dayData.pm_in || '--';
+                    pmOut = dayData.pm_out || '--';
+                    hours = dayData.hours || '0.00';
+                    break;
+                }
+            }
+        }
+        
+        html += `<tr>
+            <td>${dateStr}</td>
+            <td>${dayOfWeek}</td>
+            <td>${amIn}</td>
+            <td>${amOut}</td>
+            <td>${pmIn}</td>
+            <td>${pmOut}</td>
+            <td>${hours}</td>
+        </tr>`;
+    }
+    
+    body.innerHTML = html;
+}
+
+async function loadEmployeeDashboardData() {
     try {
-        const sessionResponse = await fetch(`${employeeApiBaseUrl}/api/session`, { credentials: 'include', cache: 'no-store' });
-        if (!sessionResponse.ok) {
-            employeeLoginRedirect();
+        const response = await fetch(`${dashboardApiBaseUrl}/api/dashboard-data`, {
+            credentials: 'include',
+            cache: 'no-store'
+        });
+        if (response.status === 401) {
+            redirectToLogin();
             return;
         }
-        const sessionData = await sessionResponse.json();
-        const user = sessionData.user;
-        if ((user.role || '').toLowerCase() !== 'employee') {
-            window.location.replace('./dashboard.html#admin-dashboard');
-            return;
-        }
+        if (!response.ok) throw new Error('Dashboard data unavailable');
 
-        setEmployeeText('dashboardUserName', user.fullname || user.username);
-        setEmployeeText('dashboardUserRole', 'EMPLOYEE');
-        setEmployeeText('employeeUid', user.uid);
-        setEmployeeText('employeeId', user.employeeid);
-        setEmployeeText('employeeRfid', user.rfid);
-        setEmployeeText('employeeRole', user.role);
-        setEmployeeText('profileName', user.fullname || user.username);
-
-        const dataResponse = await fetch(`${employeeApiBaseUrl}/api/get-latest-rfid`, { credentials: 'include', cache: 'no-store' });
-        if (!dataResponse.ok) return;
-        const data = await dataResponse.json();
-        const latest = data.employee;
-        const isMyScan = latest && latest.rfid === user.rfid;
-        setEmployeeText('employeeLatestScan', isMyScan ? data.scanned_at : 'None');
-        setEmployeeText('employeeStatus', isMyScan ? 'Present' : 'Absent');
-        setEmployeeText('employeeActivity', isMyScan ? `RFID scan recorded at ${data.scanned_at}.` : 'No RFID scan received today.');
-        setEmployeeText('attendanceMessage', isMyScan ? `Your latest scan was recorded at ${data.scanned_at}.` : 'Your attendance has not been recorded today.');
+        const result = await response.json();
+        const data = result.data || {};
+        
+        // Get current user's records
+        const user = JSON.parse(localStorage.getItem('tapinUser') || '{}');
+        const userRecords = (data.attendance || []).filter(record => 
+            record.uid === user.uid || record.employeeid === user.employeeid
+        );
+        
+        updateAttendanceSummary(userRecords);
+        updateMonthlyAttendance(userRecords);
     } catch (error) {
-        employeeLoginRedirect();
+        console.error('Error loading employee dashboard:', error);
+    }
+}
+
+async function verifyEmployeeDashboardSession() {
+    try {
+        const response = await fetch(`${dashboardApiBaseUrl}/api/session`, {
+            credentials: 'include',
+            cache: 'no-store'
+        });
+        if (!response.ok) {
+            redirectToLogin();
+            return;
+        }
+        const data = await response.json();
+        updateUserDisplay(data.user);
+        await loadEmployeeDashboardData();
+    } catch (error) {
+        redirectToLogin();
     }
 }
 
@@ -51,22 +147,22 @@ if (logoutLink) {
     logoutLink.addEventListener('click', async (event) => {
         event.preventDefault();
         try {
-            await fetch(`${employeeApiBaseUrl}/api/logout`, { method: 'POST', credentials: 'include' });
+            await fetch(`${dashboardApiBaseUrl}/api/logout`, {
+                method: 'POST',
+                credentials: 'include'
+            });
         } finally {
-            employeeLoginRedirect();
+            redirectToLogin();
         }
     });
 }
 
-function updateEmployeeClock() {
-    const now = new Date();
-    setEmployeeText('dashboardDate', now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
-    setEmployeeText('dashboardTime', now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }));
-}
-
-history.replaceState({ employeeDashboard: true }, '', window.location.href);
-window.addEventListener('popstate', () => history.pushState({ employeeDashboard: true }, '', window.location.href));
-setInterval(updateEmployeeClock, 1000);
-setInterval(loadEmployeeDashboard, 2000);
-updateEmployeeClock();
-loadEmployeeDashboard();
+history.replaceState({ dashboard: true }, '', window.location.href);
+window.addEventListener('popstate', () => {
+    history.pushState({ dashboard: true }, '', window.location.href);
+});
+window.addEventListener('pageshow', verifyEmployeeDashboardSession);
+setInterval(updateClock, 1000);
+setInterval(loadEmployeeDashboardData, 5000);
+updateClock();
+verifyEmployeeDashboardSession();
