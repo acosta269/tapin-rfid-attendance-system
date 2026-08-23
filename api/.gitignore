@@ -35,5 +35,6 @@ Thumbs.db
 database/*
 !database/
 !database/users.json
+!database/attendance.json
 storage/*
 storage/

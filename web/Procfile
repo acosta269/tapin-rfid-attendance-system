@@ -1,1 +1,1 @@
-web: serve -s . -l ${PORT:-3000}
+web: serve -s . -l $PORT

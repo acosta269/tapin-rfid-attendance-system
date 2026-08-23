@@ -2,6 +2,7 @@
 import os
 import json
 import hashlib
+import calendar
 from flask import Flask, jsonify, request, session
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -14,6 +15,8 @@ app.permanent_session_lifetime = timedelta(hours=3)
 
 # Store user records in the database folder.
 USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json")
+# Store every received RFID scan and timestamp.
+ATTENDANCE_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "attendance.json")
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
 EMPLOYEE_DASHBOARD = "/pages/employee-dashboard.html"
@@ -68,10 +71,148 @@ latest_scan = {
     "rfid": None,
     "scanned_at": None
 }
-# Keep today's scan events available for dashboard totals.
-scan_events = []
+# Load persisted DTR records and scan events.
+def load_attendance_data():
+    if not os.path.exists(ATTENDANCE_DATA_FILE):
+        return {"records": [], "scan_events": []}
+    try:
+        with open(ATTENDANCE_DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return {"records": [], "scan_events": data}
+            if "dtr" in data:
+                working_days = list(data.get("dtr", {}).values())
+                template_record = {
+                    "uid": data.get("uid", ""),
+                    "employeeid": data.get("employeeid", ""),
+                    "rfid": data.get("rfid", ""),
+                    "fullname": f"{data.get('firstname', '')} {data.get('lastname', '')}".strip(),
+                    "position": data.get("position"),
+                    "department": data.get("department"),
+                    "month": "2026-09",
+                    "working_days": working_days,
+                    "total_hours": "0.00",
+                    "total_ut": "0.00",
+                    "total_ot": "0.00"
+                }
+                return {
+                    "records": [template_record] if template_record["uid"] else [],
+                    "scan_events": []
+                }
+            return {
+                "records": data.get("records", []),
+                "scan_events": data.get("scan_events", [])
+            }
+    except (OSError, ValueError):
+        return {"records": [], "scan_events": []}
+
+attendance_data = load_attendance_data()
+attendance_records = attendance_data["records"]
+scan_events = attendance_data["scan_events"]
+if scan_events:
+    latest_scan.update({
+        "rfid": scan_events[-1].get("rfid"),
+        "scanned_at": scan_events[-1].get("scanned_at")
+    })
 
 ## Functions
+# Save DTR records and scan history to the attendance database.
+def save_attendance_data():
+    with open(ATTENDANCE_DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump({
+            "records": attendance_records,
+            "scan_events": scan_events[-10000:]
+        }, f, indent=4)
+        f.write("\n")
+
+# Build calendar rows for one DTR month.
+def build_working_days(year, month):
+    return [
+        {
+            "date": f"{year:04d}-{month:02d}-{day:02d}",
+            "day": calendar.day_abbr[calendar.weekday(year, month, day)],
+            "am_in": "",
+            "am_out": "",
+            "pm_in": "",
+            "pm_out": "",
+            "hours": "0.00",
+            "ut": "0.00",
+            "ot": "0.00"
+        }
+        for day in range(1, calendar.monthrange(year, month)[1] + 1)
+    ]
+
+# Find or create a DTR record using the user's identity fields.
+def get_attendance_record(employee, scan_date):
+    month_key = scan_date.strftime("%Y-%m")
+    for record in attendance_records:
+        if record.get("uid") == employee.get("uid") and record.get("month") == month_key:
+            return record
+
+    record = {
+        "uid": employee.get("uid"),
+        "employeeid": employee.get("employeeid"),
+        "rfid": employee.get("rfid"),
+        "fullname": f"{employee.get('firstname', '')} {employee.get('lastname', '')}".strip(),
+        "position": employee.get("position"),
+        "department": employee.get("department"),
+        "month": month_key,
+        "working_days": build_working_days(scan_date.year, scan_date.month),
+        "total_hours": "0.00",
+        "total_ut": "0.00",
+        "total_ot": "0.00"
+    }
+    attendance_records.append(record)
+    return record
+
+# Add a device timestamp to the correct AM or PM DTR slot.
+def record_attendance_scan(employee, scanned_at):
+    scan_time = parse_scan_time(scanned_at)
+
+    record = get_attendance_record(employee, scan_time)
+    day_record = next(day for day in record["working_days"] if day["date"] == scan_time.strftime("%Y-%m-%d"))
+    time_value = scan_time.strftime("%H:%M:%S")
+    period = "am" if scan_time.hour < 12 else "pm"
+    in_key = f"{period}_in"
+    out_key = f"{period}_out"
+    if not day_record[in_key]:
+        day_record[in_key] = time_value
+    elif not day_record[out_key]:
+        day_record[out_key] = time_value
+
+    am_hours = calculate_hours(day_record["am_in"], day_record["am_out"])
+    pm_hours = calculate_hours(day_record["pm_in"], day_record["pm_out"])
+    total_hours = am_hours + pm_hours
+    day_record["hours"] = f"{total_hours:.2f}"
+    day_record["ut"] = f"{max(0, 8 - total_hours):.2f}"
+    day_record["ot"] = f"{max(0, total_hours - 8):.2f}"
+    record["total_hours"] = f"{sum(float(day['hours']) for day in record['working_days']):.2f}"
+    record["total_ut"] = f"{sum(float(day['ut']) for day in record['working_days']):.2f}"
+    record["total_ot"] = f"{sum(float(day['ot']) for day in record['working_days']):.2f}"
+    return record
+
+# Parse the timestamp supplied by the RFID device.
+def parse_scan_time(scanned_at):
+    try:
+        return datetime.strptime(scanned_at, "%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError):
+        return datetime.now()
+
+# Calculate completed hours between an in and out time.
+def calculate_hours(start_time, end_time):
+    if not start_time or not end_time:
+        return 0
+    start = datetime.strptime(start_time, "%H:%M:%S")
+    end = datetime.strptime(end_time, "%H:%M:%S")
+    return max(0, (end - start).total_seconds() / 3600)
+
+# Ensure every registered user has a DTR record for the current month.
+def initialize_attendance_records():
+    current_month = datetime.now()
+    for employee in employee_database.values():
+        get_attendance_record(employee, current_month)
+    save_attendance_data()
+
 # Build the RFID lookup database from all user roles.
 def load_employee_database():
     if not os.path.exists(USER_DATA_FILE):
@@ -122,7 +263,7 @@ def get_online_devices():
 # Calculate live attendance totals from today's recognized RFID scans.
 def get_dashboard_statistics():
     today = datetime.now().date()
-    today_events = [event for event in scan_events if event["scanned_on"] == today]
+    today_events = [event for event in scan_events if event["scanned_on"] == today.isoformat()]
     employee_rfids = {
         emp.get("rfid", "").strip().upper()
         for emp in employee_database.values()
@@ -163,6 +304,7 @@ def get_dashboard_data():
                 "lastname": employee.get("lastname"),
                 "firstname": employee.get("firstname"),
                 "role": employee.get("role"),
+                "department": employee.get("department"),
                 "image": employee.get("image")
             } if employee else None
         })
@@ -180,6 +322,8 @@ def get_dashboard_data():
             "email": employee.get("email"),
             "username": employee.get("username"),
             "role": employee.get("role"),
+            "department": employee.get("department"),
+            "position": employee.get("position"),
             "image": employee.get("image"),
             "timestamp_creation": employee.get("timestamp_creation"),
             "timestamp_modified": employee.get("timestamp_modified")
@@ -189,6 +333,7 @@ def get_dashboard_data():
     return {
         "stats": get_dashboard_statistics(),
         "users": users,
+        "attendance": attendance_records,
         "scans": recent_scans,
         "devices": get_online_devices(),
         "latest_scan": recent_scans[0] if recent_scans else None
@@ -280,6 +425,8 @@ def register_employee():
             "username": str(data.get("username", "")).strip(),
             "password_hash": hashlib.md5(str(data.get("password", "")).encode("utf-8")).hexdigest(),
             "role": role,
+            "department": None,
+            "position": None,
             "image": image_path,
             "timestamp_creation": now,
             "timestamp_modified": now
@@ -434,6 +581,22 @@ def dashboard_data():
         "data": get_dashboard_data()
     }), 200
 
+# Return persistent DTR records for a requested month.
+@app.route("/api/attendance", methods=["GET"])
+def get_attendance():
+    if not session.get("user"):
+        return jsonify({
+            "status": "error",
+            "message": "Session expired or user is not logged in"
+        }), 401
+    month = request.args.get("month", datetime.now().strftime("%Y-%m"))
+    records = [record for record in attendance_records if record.get("month") == month]
+    return jsonify({
+        "status": "success",
+        "month": month,
+        "records": records
+    }), 200
+
 # API routes
 # Check whether one device is currently online.
 @app.route("/api/check-device/<device_id>", methods=["GET"])
@@ -457,6 +620,7 @@ def check_device(device_id):
 def reload_db():
     global employee_database
     employee_database = load_employee_database()
+    initialize_attendance_records()
     return jsonify({
         "status": "success",
         "message": "Database reloaded",
@@ -511,13 +675,17 @@ def receive_rfid():
 
         latest_scan["rfid"] = rfid
         latest_scan["scanned_at"] = scanned_at
-        scan_events.append({
+        scan_event = {
             "rfid": rfid,
             "scanned_at": scanned_at,
-            "scanned_on": datetime.now().date()
-        })
+            "scanned_on": datetime.now().date().isoformat()
+        }
+        scan_events.append(scan_event)
 
         employee = employee_database.get(rfid)
+        if employee:
+            record_attendance_scan(employee, scanned_at)
+        save_attendance_data()
 
         print("RFID Received:", rfid, "at", scanned_at)
 
@@ -526,6 +694,8 @@ def receive_rfid():
             return jsonify({
                 "status": "success",
                 "message": "RFID received and matched",
+                "rfid": rfid,
+                "scanned_at": scanned_at,
                 "found": True
             }), 200
         else:
@@ -533,6 +703,8 @@ def receive_rfid():
             return jsonify({
                 "status": "success",
                 "message": "RFID received - Not registered",
+                "rfid": rfid,
+                "scanned_at": scanned_at,
                 "found": False
             }), 200
 
