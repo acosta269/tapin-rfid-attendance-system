@@ -36,7 +36,7 @@ function updateClock() {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
     if (time) time.textContent = now.toLocaleTimeString(undefined, {
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
+        hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
     });
 }
 
