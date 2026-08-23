@@ -13,13 +13,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "tapin-development-secret-key")
 app.permanent_session_lifetime = timedelta(hours=3)
 
+app.config.update(
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_HTTPONLY=True
+)
+
 # Store user records in the database folder.
 USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json")
 # Store every received RFID scan and timestamp.
 ATTENDANCE_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "attendance.json")
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
-EMPLOYEE_DASHBOARD = "/pages/employee-dashboard.html"
+EMPLOYEE_DASHBOARD = "/pages/dashboard.html"
 # Choose the frontend destination from the role stored in users.json.
 ROLE_DASHBOARDS = {
     "admin": WEB_DASHBOARD,
@@ -38,7 +44,7 @@ def add_cors_headers(response):
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     if request.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
@@ -83,6 +89,7 @@ def load_attendance_data():
             if "dtr" in data:
                 working_days = list(data.get("dtr", {}).values())
                 template_record = {
+                    "id": data.get("id") or "001",
                     "uid": data.get("uid", ""),
                     "employeeid": data.get("employeeid", ""),
                     "rfid": data.get("rfid", ""),
@@ -145,11 +152,16 @@ def build_working_days(year, month):
 # Find or create a DTR record using the user's identity fields.
 def get_attendance_record(employee, scan_date):
     month_key = scan_date.strftime("%Y-%m")
+    
     for record in attendance_records:
         if record.get("uid") == employee.get("uid") and record.get("month") == month_key:
             return record
 
+    existing_ids = [int(r.get("id", 0)) for r in attendance_records if str(r.get("id", "")).isdigit()]
+    new_id = str(max(existing_ids + [0]) + 1).zfill(3)
+
     record = {
+        "id": new_id,
         "uid": employee.get("uid"),
         "employeeid": employee.get("employeeid"),
         "rfid": employee.get("rfid"),
@@ -685,6 +697,9 @@ def receive_rfid():
         employee = employee_database.get(rfid)
         if employee:
             record_attendance_scan(employee, scanned_at)
+        else:
+            print("RFID not found in database:", rfid)
+
         save_attendance_data()
 
         print("RFID Received:", rfid, "at", scanned_at)
@@ -724,7 +739,17 @@ def page_not_found(e):
         "timestamp": datetime.now().isoformat()
     }), 404
 
+# OPTIONS handlers for CORS preflight
+@app.route("/api/login", methods=["OPTIONS"])
+@app.route("/api/session", methods=["OPTIONS"])
+@app.route("/api/logout", methods=["OPTIONS"])
+@app.route("/api/dashboard-data", methods=["OPTIONS"])
+def handle_options():
+    return "", 200
+
 ## Main
 if __name__ == "__main__":
+    # Initialize attendance records for all users at startup
+    initialize_attendance_records()
     app.run()
     #app.run(debug=True, port=5001)
