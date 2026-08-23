@@ -16,11 +16,12 @@ app.permanent_session_lifetime = timedelta(hours=3)
 USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json")
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
+EMPLOYEE_DASHBOARD = "/pages/employee-dashboard.html"
 # Choose the frontend destination from the role stored in users.json.
 ROLE_DASHBOARDS = {
     "admin": WEB_DASHBOARD,
     "hr": WEB_DASHBOARD,
-    "employee": WEB_DASHBOARD,
+    "employee": EMPLOYEE_DASHBOARD,
 }
 # Assign separate UID ranges to each user role.
 ROLE_UID_RANGES = {"admin": (1, 9), "hr": (10, 19), "employee": (20, float("inf"))}
@@ -393,9 +394,12 @@ def get_latest_rfid():
         "devices": get_online_devices(),
         "found": bool(employee),
         "employee": {
+            "uid": employee.get("uid"),
+            "rfid": employee.get("rfid"),
             "employeeid": employee.get("employeeid"),
             "lastname": employee.get("lastname"),
             "firstname": employee.get("firstname"),
+            "role": employee.get("role"),
             "image": employee.get("image")
         } if employee else None
     }), 200

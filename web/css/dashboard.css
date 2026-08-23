@@ -1,12 +1,3 @@
-/* ============================================================
-   TAPIN - RFID-Based Attendance Management System
-   Style Sheet | Version 1.0
-   ISPSC Tagudin Campus
-   ============================================================ */
-
-/* ============================================================
-   1. CSS VARIABLES & DESIGN TOKENS
-   ============================================================ */
 :root {
   --primary:       #2563EB;
   --primary-dark:  #1D4ED8;
@@ -55,9 +46,6 @@
   --transition: .2s ease;
 }
 
-/* ============================================================
-   2. RESET & BASE
-   ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
@@ -76,9 +64,6 @@ img { max-width: 100%; display: block; }
 button { cursor: pointer; border: none; background: none; font: inherit; }
 input, select, textarea { font: inherit; }
 
-/* ============================================================
-   3. LAYOUT — WRAPPER, SIDEBAR, MAIN
-   ============================================================ */
 .wrapper {
   display: flex;
   min-height: 100vh;
@@ -253,9 +238,6 @@ input, select, textarea { font: inherit; }
   min-height: 100vh;
 }
 
-/* ============================================================
-   4. TOPBAR
-   ============================================================ */
 .topbar {
   position: sticky;
   top: 0;
@@ -377,9 +359,6 @@ input, select, textarea { font: inherit; }
 .admin-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
 .admin-role { font-size: 10px; color: var(--text-muted); }
 
-/* ============================================================
-   5. BREADCRUMB
-   ============================================================ */
 .breadcrumb {
   display: flex;
   align-items: center;
@@ -395,9 +374,6 @@ input, select, textarea { font: inherit; }
 .breadcrumb-sep { color: var(--border-dark); }
 .breadcrumb-current { color: var(--text); font-weight: 600; }
 
-/* ============================================================
-   6. CONTENT AREA
-   ============================================================ */
 .content {
   flex: 1;
   padding: 8px 28px 32px;
@@ -437,9 +413,6 @@ input, select, textarea { font: inherit; }
   padding-top: 8px;
 }
 
-/* ============================================================
-   7. BUTTONS
-   ============================================================ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -480,9 +453,6 @@ input, select, textarea { font: inherit; }
 .btn-sm { padding: 5px 11px; font-size: 12px; }
 .btn-icon { padding: 8px; }
 
-/* ============================================================
-   8. CARDS
-   ============================================================ */
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -524,9 +494,6 @@ input, select, textarea { font: inherit; }
 .card-body { padding: 20px; }
 .card-footer { padding: 14px 20px; border-top: 1px solid var(--border); background: #FAFAFA; }
 
-/* ============================================================
-   9. STAT CARDS
-   ============================================================ */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -640,9 +607,6 @@ input, select, textarea { font: inherit; }
 .stat-cyan .stat-progress-bar { background: linear-gradient(90deg, var(--accent), #22D3EE); }
 .stat-cyan::before { background: var(--accent); }
 
-/* ============================================================
-   10. QUICK ACTIONS
-   ============================================================ */
 .quick-actions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -692,9 +656,6 @@ input, select, textarea { font: inherit; }
   transition: color var(--transition);
 }
 
-/* ============================================================
-   11. TABLES
-   ============================================================ */
 .table-wrap {
   overflow-x: auto;
   border-radius: var(--radius);
@@ -767,9 +728,6 @@ input, select, textarea { font: inherit; }
 .action-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
 .action-btn.danger:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-light); }
 
-/* ============================================================
-   12. BADGES / STATUS
-   ============================================================ */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -805,9 +763,6 @@ input, select, textarea { font: inherit; }
 .badge-rejected { background: var(--danger-light); color: #B91C1C; }
 .badge-draft    { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
 
-/* ============================================================
-   13. EMPLOYEE CARDS
-   ============================================================ */
 .employees-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -891,9 +846,6 @@ input, select, textarea { font: inherit; }
 .emp-stat-val { font-size: 16px; font-weight: 800; color: var(--primary); }
 .emp-stat-lbl { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 
-/* ============================================================
-   14. REPORT CARDS
-   ============================================================ */
 .reports-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -979,9 +931,6 @@ input, select, textarea { font: inherit; }
 .btn-report-excel { background: var(--success-light); color: #15803D; border-color: transparent; }
 .btn-report-gen { background: var(--primary); color: white; border-color: transparent; }
 
-/* ============================================================
-   15. DTR FORM
-   ============================================================ */
 .dtr-wrap { max-width: 900px; margin: 0 auto; }
 
 .dtr-form {
@@ -1121,9 +1070,6 @@ input, select, textarea { font: inherit; }
 .sig-name { font-size: 13px; font-weight: 700; }
 .sig-title { font-size: 11px; color: var(--text-muted); }
 
-/* ============================================================
-   16. HR LETTER CARDS
-   ============================================================ */
 .hr-letters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -1165,9 +1111,6 @@ input, select, textarea { font: inherit; }
   gap: 8px;
 }
 
-/* ============================================================
-   17. TEMPLATE CARDS
-   ============================================================ */
 .templates-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1210,9 +1153,6 @@ input, select, textarea { font: inherit; }
 .template-title { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.3; }
 .template-count { font-size: 11px; color: var(--text-muted); }
 
-/* ============================================================
-   18. INFO / INTRO CARDS
-   ============================================================ */
 .info-hero {
   background: linear-gradient(135deg, var(--primary), var(--accent));
   border-radius: var(--radius-lg);
@@ -1275,9 +1215,6 @@ input, select, textarea { font: inherit; }
 .info-card ul { padding-left: 18px; margin-top: 8px; }
 .info-card li { margin-bottom: 4px; }
 
-/* ============================================================
-   19. REALTIME / SYSTEM STATUS
-   ============================================================ */
 .realtime-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1351,9 +1288,6 @@ input, select, textarea { font: inherit; }
 .text-online { color: var(--success); }
 .text-offline { color: var(--danger); }
 
-/* ============================================================
-   20. ACTIVITY TIMELINE
-   ============================================================ */
 .timeline { position: relative; padding-left: 24px; }
 
 .timeline::before {
@@ -1413,9 +1347,6 @@ input, select, textarea { font: inherit; }
   flex-shrink: 0;
 }
 
-/* ============================================================
-   21. DASHBOARD WIDGETS
-   ============================================================ */
 .widgets-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1484,9 +1415,6 @@ input, select, textarea { font: inherit; }
 .alert-info { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); }
 .alert-success { background: var(--success-light); border-color: var(--success); color: #166534; }
 
-/* ============================================================
-   22. ATTENDANCE RATE CIRCLE
-   ============================================================ */
 .rate-circle-wrap {
   display: flex;
   flex-direction: column;
@@ -1518,9 +1446,6 @@ input, select, textarea { font: inherit; }
   color: var(--success);
 }
 
-/* ============================================================
-   23. PROGRESS BARS
-   ============================================================ */
 .progress-wrap { margin-bottom: 10px; }
 
 .progress-label {
@@ -1546,9 +1471,6 @@ input, select, textarea { font: inherit; }
   animation: progressLoad 1.2s ease-out forwards;
 }
 
-/* ============================================================
-   24. GRID UTILITIES
-   ============================================================ */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
@@ -1574,9 +1496,6 @@ input, select, textarea { font: inherit; }
 .text-danger { color: var(--danger); }
 .text-warning { color: var(--warning); }
 
-/* ============================================================
-   25. FILTER BAR
-   ============================================================ */
 .filter-bar {
   display: flex;
   align-items: center;
@@ -1619,9 +1538,6 @@ input, select, textarea { font: inherit; }
   cursor: pointer;
 }
 
-/* ============================================================
-   26. FOOTER
-   ============================================================ */
 .footer {
   background: var(--sidebar-bg);
   color: #64748B;
@@ -1642,9 +1558,6 @@ input, select, textarea { font: inherit; }
 .footer-info { font-size: 11px; text-align: right; }
 .footer-info p { margin-bottom: 2px; }
 
-/* ============================================================
-   27. RESPONSIVE
-   ============================================================ */
 @media (max-width: 1024px) {
   :root { --sidebar-w: 220px; }
   .stats-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -1679,9 +1592,6 @@ input, select, textarea { font: inherit; }
   .templates-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ============================================================
-   28. MISC UTILITIES
-   ============================================================ */
 .divider { height: 1px; background: var(--border); margin: 20px 0; }
 .text-center { text-align: center; }
 .w-full { width: 100%; }
@@ -1721,6 +1631,3 @@ input, select, textarea { font: inherit; }
   color: var(--text-muted);
 }
 
-/* ============================================================
-   END OF STYLE.CSS
-   ============================================================ */

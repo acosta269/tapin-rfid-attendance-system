@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TAPIN - Employee Dashboard</title>
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="wrapper">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+        <div class="brand-text"><div class="brand-name">TAPIN</div><div class="brand-sub">ISPSC TAGUDIN</div></div>
+      </div>
+      <div class="sidebar-section-label">Employee</div>
+      <nav class="sidebar-nav">
+        <a href="#employee-dashboard" class="nav-item active"><span class="nav-icon"><i class="fa-solid fa-gauge-high"></i></span>Dashboard</a>
+        <a href="#attendance" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-calendar-check"></i></span>My Attendance</a>
+        <a href="#profile" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-circle-user"></i></span>My Profile</a>
+        <a href="#" id="tapinLogout" class="nav-item" style="color:#EF4444;"><span class="nav-icon" style="color:#EF4444;"><i class="fa-solid fa-right-from-bracket"></i></span>Logout</a>
+      </nav>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-center"><span class="topbar-date" id="dashboardDate">Loading date...</span><span class="topbar-time" id="dashboardTime">Loading time...</span></div>
+        <div class="topbar-actions"><div class="admin-chip"><div class="admin-avatar">EM</div><div class="admin-info"><div class="admin-name" id="dashboardUserName">Loading user...</div><div class="admin-role" id="dashboardUserRole">Checking session...</div></div></div></div>
+      </header>
+
+      <div class="content">
+        <section class="page-section" id="employee-dashboard">
+          <div class="section-actions"><div><h1 class="section-title">My Attendance Dashboard</h1><p class="section-subtitle">Review your attendance activity and latest RFID record.</p></div></div>
+          <div class="stats-grid">
+            <div class="stat-card stat-blue"><div class="stat-icon-wrap"><i class="fa-solid fa-id-card"></i></div><div class="stat-label">My UID</div><div class="stat-value" id="employeeUid">--</div></div>
+            <div class="stat-card stat-green"><div class="stat-icon-wrap"><i class="fa-solid fa-circle-check"></i></div><div class="stat-label">Today's Status</div><div class="stat-value" id="employeeStatus">Waiting</div></div>
+            <div class="stat-card stat-cyan"><div class="stat-icon-wrap"><i class="fa-solid fa-clock"></i></div><div class="stat-label">Latest Scan</div><div class="stat-value" id="employeeLatestScan">--</div></div>
+          </div>
+          <div class="grid-2">
+            <div class="card"><div class="card-header"><div class="card-title"><i class="fa-solid fa-user"></i> Account Information</div></div><div class="card-body"><div class="emp-card-info"><div class="emp-info-row"><i class="fa-solid fa-id-badge"></i><span class="emp-info-val" id="employeeId">--</span></div><div class="emp-info-row"><i class="fa-solid fa-wifi"></i><span class="emp-info-val" id="employeeRfid">--</span></div><div class="emp-info-row"><i class="fa-solid fa-user-tag"></i><span class="emp-info-val" id="employeeRole">Employee</span></div></div></div></div>
+            <div class="card"><div class="card-header"><div class="card-title"><i class="fa-solid fa-signal"></i> Latest RFID Activity</div></div><div class="card-body"><p id="employeeActivity">No RFID scan received yet.</p></div></div>
+          </div>
+        </section>
+        <section class="page-section" id="attendance"><div class="section-actions"><div><h1 class="section-title">My Attendance</h1><p class="section-subtitle">Your latest attendance activity is shown here.</p></div></div><div class="card"><div class="card-body"><p id="attendanceMessage">Attendance data will update when your RFID card is scanned.</p></div></div></section>
+        <section class="page-section" id="profile"><div class="section-actions"><div><h1 class="section-title">My Profile</h1><p class="section-subtitle">Your account details.</p></div></div><div class="card"><div class="card-body"><p id="profileName">Loading profile...</p></div></div></section>
+      </div>
+    </div>
+  </div>
+  <script src="../js/employee-dashboard.js"></script>
+</body>
+</html>
