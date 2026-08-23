@@ -13,6 +13,8 @@
             "username": "admin",
             "password_hash": "21232f297a57a5a743894a0e4a801fc3",
             "role": "admin",
+            "position": null,
+            "department": null,
             "image": "storage/profiles/admin/001/admin-profile.jpg",
             "timestamp_creation": "2026-08-03 15:00:00",
             "timestamp_modified": "2026-08-03 15:00:00"
@@ -32,6 +34,8 @@
             "username": "hr_maria",
             "password_hash": "4435a4e88e984616a91c109524caf662",
             "role": "hr",
+            "position": null,
+            "department": null,
             "image": "storage/profiles/hr/010/maria-reyes.jpg",
             "timestamp_creation": "2026-08-03 15:10:00",
             "timestamp_modified": "2026-08-03 15:10:00"
@@ -51,6 +55,8 @@
             "username": "juan001",
             "password_hash": "0d58a12a4807c31223d83bde207a8f22",
             "role": "employee",
+            "position": null,
+            "department": null,
             "image": "storage/profiles/employees/020/juan-cruz.jpg",
             "timestamp_creation": "2026-08-03 15:20:00",
             "timestamp_modified": "2026-08-03 15:20:00"
@@ -68,6 +74,8 @@
             "username": "mark002",
             "password_hash": "6f3f59b269d9b38e130c887a513a21d5",
             "role": "employee",
+            "position": null,
+            "department": null,
             "image": "storage/profiles/employees/021/mark-acosta.jpg",
             "timestamp_creation": "2026-08-03 15:25:00",
             "timestamp_modified": "2026-08-03 15:25:00"
