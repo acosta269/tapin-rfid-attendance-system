@@ -13,10 +13,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "tapin-development-secret-key")
 app.permanent_session_lifetime = timedelta(hours=3)
 
+# Update session cookie settings for better compatibility
 app.config.update(
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=False,
-    SESSION_COOKIE_HTTPONLY=True
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_PATH='/'
 )
 
 # Store user records in the database folder.
@@ -25,7 +27,7 @@ USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json
 ATTENDANCE_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "attendance.json")
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
-EMPLOYEE_DASHBOARD = "/pages/dashboard.html"
+EMPLOYEE_DASHBOARD = "/pages/employee-dashboard.html"
 # Choose the frontend destination from the role stored in users.json.
 ROLE_DASHBOARDS = {
     "admin": WEB_DASHBOARD,
@@ -358,8 +360,7 @@ def get_user_role(user):
 
 # Build the frontend destination for the authenticated role.
 def get_role_redirect(role):
-    section = "admin-dashboard" if role in ["admin", "hr"] else "dashboard"
-    return ROLE_DASHBOARDS[role] + "#" + section
+    return ROLE_DASHBOARDS[role]
 
 ## Routes
 # Register a new admin, HR, or employee account.

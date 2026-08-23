@@ -18,8 +18,8 @@ async function checkAlreadyLoggedIn() {
             if (data.user) {
                 const role = data.user.role || 'employee';
                 const redirectUrl = role === 'admin' || role === 'hr' 
-                    ? '../pages/dashboard.html#admin-dashboard' 
-                    : '../pages/dashboard.html#dashboard';
+                    ? '../pages/dashboard.html' 
+                    : '../pages/employee-dashboard.html';
                 window.location.replace(redirectUrl);
             }
         }
@@ -73,14 +73,14 @@ if (form) {
                 throw new Error(result.message || 'Username or password is incorrect.');
             }
 
-            await new Promise(resolve => setTimeout(resolve, 500));
-
             localStorage.setItem('tapinUser', JSON.stringify(result.user));
             if (rememberInput.checked) {
                 localStorage.setItem('tapinRememberedUsername', username);
             } else {
                 localStorage.removeItem('tapinRememberedUsername');
             }
+            
+            // Use the redirect URL from the server
             const dashboardUrl = new URL(result.redirect, window.location.origin);
             window.location.replace(dashboardUrl.href);
         } catch (error) {
