@@ -15,10 +15,11 @@ app.permanent_session_lifetime = timedelta(hours=3)
 
 # Update session cookie settings for better compatibility
 app.config.update(
-    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SAMESITE='None',
     SESSION_COOKIE_SECURE=False,
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_PATH='/'
+    SESSION_COOKIE_PATH='/',
+    SESSION_COOKIE_DOMAIN=None
 )
 
 # Store user records in the database folder.
@@ -153,14 +154,14 @@ def build_working_days(year, month):
 
 # Find or create a DTR record using the user's identity fields.
 def get_attendance_record(employee, scan_date):
-    month_key = scan_date.strftime("%Y-%m")
+    existing_ids = [int(r.get("id", 0)) for r in attendance_records if str(r.get("id", "")).isdigit()]
+    new_id = str(max(existing_ids + [0]) + 1).zfill(3)
     
     for record in attendance_records:
         if record.get("uid") == employee.get("uid") and record.get("month") == month_key:
             return record
 
-    existing_ids = [int(r.get("id", 0)) for r in attendance_records if str(r.get("id", "")).isdigit()]
-    new_id = str(max(existing_ids + [0]) + 1).zfill(3)
+    month_key = scan_date.strftime("%Y-%m")
 
     record = {
         "id": new_id,
@@ -492,6 +493,8 @@ def login():
                         "role": role,
                         "rfid": emp.get("rfid")
                     }
+                    # Mark session as modified to ensure it's saved
+                    session.modified = True
                     return jsonify({
                         "status": "success",
                         "message": "Login successful",
@@ -746,11 +749,18 @@ def page_not_found(e):
 @app.route("/api/logout", methods=["OPTIONS"])
 @app.route("/api/dashboard-data", methods=["OPTIONS"])
 def handle_options():
-    return "", 200
+    response = jsonify({"status": "ok"})
+    origin = request.headers.get("Origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response, 200
 
 ## Main
 if __name__ == "__main__":
     # Initialize attendance records for all users at startup
     initialize_attendance_records()
-    app.run()
+    app.run(host='0.0.0.0', port=5000, debug=True)
     #app.run(debug=True, port=5001)

@@ -37,16 +37,23 @@ if (form) {
         passwordToggle.setAttribute('title', showingPassword ? 'Show password' : 'Hide password');
     });
 
+    // Load remembered credentials
     const rememberedUsername = localStorage.getItem('tapinRememberedUsername');
-    if (rememberedUsername) {
+    const rememberedPassword = localStorage.getItem('tapinRememberedPassword');
+    
+    if (rememberedUsername && rememberedPassword) {
         form.username.value = rememberedUsername;
-        rememberInput.checked = true;
+        passwordInput.value = rememberedPassword;
+        if (rememberInput) rememberInput.checked = true;
+    } else if (rememberedUsername) {
+        form.username.value = rememberedUsername;
+        if (rememberInput) rememberInput.checked = true;
     }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = form.username.value.trim();
-        const pass = form.password.value;
+        const pass = passwordInput.value;
 
         if (!username || !pass) {
             message.textContent = 'Please enter both username and password.';
@@ -73,11 +80,25 @@ if (form) {
                 throw new Error(result.message || 'Username or password is incorrect.');
             }
 
-            localStorage.setItem('tapinUser', JSON.stringify(result.user));
-            if (rememberInput.checked) {
+             // Save to localStorage based on remember me checkbox
+            if (rememberInput && rememberInput.checked) {
                 localStorage.setItem('tapinRememberedUsername', username);
+                localStorage.setItem('tapinRememberedPassword', pass);
             } else {
                 localStorage.removeItem('tapinRememberedUsername');
+                localStorage.removeItem('tapinRememberedPassword');
+            }
+
+            localStorage.setItem('tapinUser', JSON.stringify(result.user));
+
+            // Check if session was set by verifying immediately
+            const sessionCheck = await fetch(`${apiBaseUrl}/api/session`, {
+                credentials: 'include',
+                cache: 'no-store'
+            });
+            
+            if (!sessionCheck.ok) {
+                throw new Error('Session could not be established. Please try again.');
             }
             
             // Use the redirect URL from the server
