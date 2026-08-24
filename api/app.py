@@ -19,7 +19,8 @@ app.config.update(
     SESSION_COOKIE_SECURE=False,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_PATH='/',
-    SESSION_COOKIE_DOMAIN=None
+    SESSION_COOKIE_DOMAIN=None,
+    SESSION_COOKIE_NAME='tapin_session'
 )
 
 # Store user records in the database folder.
@@ -154,13 +155,14 @@ def build_working_days(year, month):
 
 # Find or create a DTR record using the user's identity fields.
 def get_attendance_record(employee, scan_date):
+    # Generate a new unique ID based on the highest existing numeric ID
     existing_ids = [int(r.get("id", 0)) for r in attendance_records if str(r.get("id", "")).isdigit()]
     new_id = str(max(existing_ids + [0]) + 1).zfill(3)
     
     for record in attendance_records:
         if record.get("uid") == employee.get("uid") and record.get("month") == month_key:
             return record
-
+            
     month_key = scan_date.strftime("%Y-%m")
 
     record = {
@@ -495,6 +497,11 @@ def login():
                     }
                     # Mark session as modified to ensure it's saved
                     session.modified = True
+                    
+                    # Log session data for debugging
+                    print("Session set for user:", username, "Role:", role)
+                    print("Session data:", session.get("user"))
+                    
                     return jsonify({
                         "status": "success",
                         "message": "Login successful",
@@ -514,6 +521,7 @@ def login():
             "message": "Invalid username or password"
         }), 401
     except Exception as e:
+        print("Login error:", str(e))
         return jsonify({
             "status": "error",
             "message": str(e)
@@ -523,6 +531,8 @@ def login():
 @app.route("/api/session", methods=["GET"])
 def get_session():
     user = session.get("user")
+    print("Session check - User:", user)
+    print("Session data:", dict(session))
     if not user:
         return jsonify({
             "status": "error",
@@ -702,6 +712,7 @@ def receive_rfid():
         if employee:
             record_attendance_scan(employee, scanned_at)
         else:
+            # Ensure unknown RFID scans are still tracked for later lookup
             print("RFID not found in database:", rfid)
 
         save_attendance_data()

@@ -80,7 +80,7 @@ if (form) {
                 throw new Error(result.message || 'Username or password is incorrect.');
             }
 
-             // Save to localStorage based on remember me checkbox
+            // Save to localStorage based on remember me checkbox
             if (rememberInput && rememberInput.checked) {
                 localStorage.setItem('tapinRememberedUsername', username);
                 localStorage.setItem('tapinRememberedPassword', pass);
@@ -91,19 +91,10 @@ if (form) {
 
             localStorage.setItem('tapinUser', JSON.stringify(result.user));
 
-            // Check if session was set by verifying immediately
-            const sessionCheck = await fetch(`${apiBaseUrl}/api/session`, {
-                credentials: 'include',
-                cache: 'no-store'
-            });
-            
-            if (!sessionCheck.ok) {
-                throw new Error('Session could not be established. Please try again.');
-            }
-            
             // Use the redirect URL from the server
             const dashboardUrl = new URL(result.redirect, window.location.origin);
             window.location.replace(dashboardUrl.href);
+            
         } catch (error) {
             message.textContent = error.message || 'Unable to connect to the server.';
             message.className = 'form-message error';
