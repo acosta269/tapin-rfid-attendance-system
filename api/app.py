@@ -3,6 +3,8 @@ import os
 import json
 import hashlib
 import calendar
+import jwt
+import secrets
 from flask import Flask, jsonify, request, session
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -12,6 +14,10 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "tapin-development-secret-key")
 app.permanent_session_lifetime = timedelta(hours=3)
+
+# JWT Configuration
+JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_urlsafe(32))
+JWT_EXPIRATION = timedelta(hours=3)
 
 # Update session cookie settings for better compatibility
 app.config.update(
@@ -48,8 +54,8 @@ def add_cors_headers(response):
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
     if request.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -81,6 +87,7 @@ latest_scan = {
     "rfid": None,
     "scanned_at": None
 }
+
 # Load persisted DTR records and scan events.
 def load_attendance_data():
     if not os.path.exists(ATTENDANCE_DATA_FILE):
@@ -155,15 +162,15 @@ def build_working_days(year, month):
 
 # Find or create a DTR record using the user's identity fields.
 def get_attendance_record(employee, scan_date):
-    # Generate a new unique ID based on the highest existing numeric ID
-    existing_ids = [int(r.get("id", 0)) for r in attendance_records if str(r.get("id", "")).isdigit()]
-    new_id = str(max(existing_ids + [0]) + 1).zfill(3)
+    month_key = scan_date.strftime("%Y-%m")
     
     for record in attendance_records:
         if record.get("uid") == employee.get("uid") and record.get("month") == month_key:
             return record
-            
-    month_key = scan_date.strftime("%Y-%m")
+
+    # Generate a new unique ID based on the highest existing numeric ID
+    existing_ids = [int(r.get("id", 0)) for r in attendance_records if str(r.get("id", "")).isdigit()]
+    new_id = str(max(existing_ids + [0]) + 1).zfill(3)
 
     record = {
         "id": new_id,
@@ -365,6 +372,24 @@ def get_user_role(user):
 def get_role_redirect(role):
     return ROLE_DASHBOARDS[role]
 
+# Helper function to verify JWT token
+def verify_token():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None, jsonify({"status": "error", "message": "No token provided"}), 401
+    
+    token = auth_header.split(' ')[1]
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        user_data = payload.get('user')
+        if not user_data:
+            return None, jsonify({"status": "error", "message": "Invalid token"}), 401
+        return user_data, None, None
+    except jwt.ExpiredSignatureError:
+        return None, jsonify({"status": "error", "message": "Token expired"}), 401
+    except jwt.InvalidTokenError:
+        return None, jsonify({"status": "error", "message": "Invalid token"}), 401
+
 ## Routes
 # Register a new admin, HR, or employee account.
 @app.route("/api/register-employee", methods=["POST"])
@@ -486,8 +511,7 @@ def login():
                 if password_hash == emp.get("password_hash", "").lower():
                     # Admin and HR use the command center; employees use the main dashboard.
                     role = get_user_role(emp)
-                    session.permanent = True
-                    session["user"] = {
+                    user_data = {
                         "uid": emp.get("uid"),
                         "employeeid": emp.get("employeeid"),
                         "username": emp.get("username"),
@@ -495,25 +519,26 @@ def login():
                         "role": role,
                         "rfid": emp.get("rfid")
                     }
-                    # Mark session as modified to ensure it's saved
+                    
+                    # Create JWT token
+                    token = jwt.encode({
+                        'user': user_data,
+                        'exp': datetime.utcnow() + JWT_EXPIRATION
+                    }, JWT_SECRET, algorithm='HS256')
+                    
+                    # Also set session for backward compatibility
+                    session.permanent = True
+                    session["user"] = user_data
                     session.modified = True
                     
-                    # Log session data for debugging
-                    print("Session set for user:", username, "Role:", role)
-                    print("Session data:", session.get("user"))
+                    print("Login successful for:", username)
                     
                     return jsonify({
                         "status": "success",
                         "message": "Login successful",
                         "redirect": get_role_redirect(role),
-                        "user": {
-                            "uid": emp.get("uid"),
-                            "employeeid": emp.get("employeeid"),
-                            "username": emp.get("username"),
-                            "fullname": emp.get("firstname", "") + " " + emp.get("lastname", ""),
-                            "role": role,
-                            "rfid": emp.get("rfid")
-                        }
+                        "user": user_data,
+                        "token": token
                     }), 200
 
         return jsonify({
@@ -527,12 +552,26 @@ def login():
             "message": str(e)
         }), 500
 
+# Verify JWT token
+@app.route("/api/verify-token", methods=["POST"])
+def verify_token_route():
+    user_data, error_response, status_code = verify_token()
+    if error_response:
+        return error_response, status_code
+    return jsonify({"status": "success", "user": user_data}), 200
+
 # Return the currently authenticated user's session.
 @app.route("/api/session", methods=["GET"])
 def get_session():
+    # First try to get user from token
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        user_data, error_response, status_code = verify_token()
+        if not error_response:
+            return jsonify({"status": "success", "user": user_data}), 200
+    
+    # Fallback to session
     user = session.get("user")
-    print("Session check - User:", user)
-    print("Session data:", dict(session))
     if not user:
         return jsonify({
             "status": "error",
@@ -597,11 +636,20 @@ def dashboard_stats():
 # Return all current dashboard data in one authenticated response.
 @app.route("/api/dashboard-data", methods=["GET"])
 def dashboard_data():
-    if not session.get("user"):
-        return jsonify({
-            "status": "error",
-            "message": "Session expired or user is not logged in"
-        }), 401
+    # Check token first
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        user_data, error_response, status_code = verify_token()
+        if error_response:
+            return error_response, status_code
+    else:
+        # Fallback to session
+        if not session.get("user"):
+            return jsonify({
+                "status": "error",
+                "message": "Session expired or user is not logged in"
+            }), 401
+    
     return jsonify({
         "status": "success",
         "data": get_dashboard_data()
@@ -610,11 +658,20 @@ def dashboard_data():
 # Return persistent DTR records for a requested month.
 @app.route("/api/attendance", methods=["GET"])
 def get_attendance():
-    if not session.get("user"):
-        return jsonify({
-            "status": "error",
-            "message": "Session expired or user is not logged in"
-        }), 401
+    # Check token first
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        user_data, error_response, status_code = verify_token()
+        if error_response:
+            return error_response, status_code
+    else:
+        # Fallback to session
+        if not session.get("user"):
+            return jsonify({
+                "status": "error",
+                "message": "Session expired or user is not logged in"
+            }), 401
+    
     month = request.args.get("month", datetime.now().strftime("%Y-%m"))
     records = [record for record in attendance_records if record.get("month") == month]
     return jsonify({
@@ -759,14 +816,15 @@ def page_not_found(e):
 @app.route("/api/session", methods=["OPTIONS"])
 @app.route("/api/logout", methods=["OPTIONS"])
 @app.route("/api/dashboard-data", methods=["OPTIONS"])
+@app.route("/api/verify-token", methods=["OPTIONS"])
 def handle_options():
     response = jsonify({"status": "ok"})
     origin = request.headers.get("Origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
     return response, 200
 
 ## Main
@@ -774,4 +832,3 @@ if __name__ == "__main__":
     # Initialize attendance records for all users at startup
     initialize_attendance_records()
     app.run(host='0.0.0.0', port=5000, debug=True)
-    #app.run(debug=True, port=5001)
