@@ -1,8 +1,18 @@
+// Use Railway API by default
 const dashboardApiBaseUrl = window.TAPIN_API_URL || 'https://tapin-api.up.railway.app';
 
 function redirectToLogin() {
     localStorage.removeItem('tapinUser');
-    window.location.replace('../login.html');
+    localStorage.removeItem('tapinToken');
+    window.location.replace('login.html');
+}
+
+function getAuthHeaders() {
+    const token = localStorage.getItem('tapinToken');
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
 }
 
 function updateUserDisplay(user) {
@@ -99,6 +109,8 @@ function updateMonthlyAttendance(records) {
 async function loadEmployeeDashboardData() {
     try {
         const response = await fetch(`${dashboardApiBaseUrl}/api/dashboard-data`, {
+            method: 'GET',
+            headers: getAuthHeaders(),
             credentials: 'include',
             cache: 'no-store'
         });
@@ -125,8 +137,19 @@ async function loadEmployeeDashboardData() {
 }
 
 async function verifyEmployeeDashboardSession() {
+    const token = localStorage.getItem('tapinToken');
+    if (!token) {
+        redirectToLogin();
+        return;
+    }
+    
     try {
-        const response = await fetch(`${dashboardApiBaseUrl}/api/session`, {
+        const response = await fetch(`${dashboardApiBaseUrl}/api/verify-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             credentials: 'include',
             cache: 'no-store'
         });
@@ -149,10 +172,13 @@ if (logoutLink) {
         try {
             await fetch(`${dashboardApiBaseUrl}/api/logout`, {
                 method: 'POST',
+                headers: getAuthHeaders(),
                 credentials: 'include'
             });
         } finally {
-            redirectToLogin();
+            localStorage.removeItem('tapinToken');
+            localStorage.removeItem('tapinUser');
+            window.location.replace('login.html');
         }
     });
 }

@@ -1,5 +1,6 @@
 const form = document.getElementById('loginForm');
 const message = document.getElementById('formMessage');
+// Use Railway API by default, can be overridden with window.TAPIN_API_URL
 const apiBaseUrl = window.TAPIN_API_URL || 'https://tapin-api.up.railway.app';
 const submitButton = form ? form.querySelector('button[type="submit"]') : null;
 const rememberInput = form ? form.querySelector('input[name="remember"]') : null;
@@ -27,8 +28,8 @@ async function checkAlreadyLoggedIn() {
             if (data.user) {
                 const role = data.user.role || 'employee';
                 const redirectUrl = role === 'admin' || role === 'hr' 
-                    ? '../pages/dashboard.html' 
-                    : '../pages/employee-dashboard.html';
+                    ? 'pages/dashboard.html' 
+                    : 'pages/employee-dashboard.html';
                 window.location.replace(redirectUrl);
             }
         }
@@ -102,8 +103,10 @@ if (form) {
             localStorage.setItem('tapinToken', result.token);
 
             // Use the redirect URL from the server
-            const dashboardUrl = new URL(result.redirect, window.location.origin);
-            window.location.replace(dashboardUrl.href);
+            const redirectPath = result.redirect || 'pages/dashboard.html';
+            // Remove leading slash if present
+            const cleanPath = redirectPath.startsWith('/') ? redirectPath.substring(1) : redirectPath;
+            window.location.replace(cleanPath);
             
         } catch (error) {
             message.textContent = error.message || 'Unable to connect to the server.';
