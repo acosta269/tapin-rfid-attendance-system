@@ -5,7 +5,7 @@ import hashlib
 import calendar
 import jwt
 import secrets
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, session, send_from_directory, send_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 
@@ -47,19 +47,6 @@ ROLE_UID_RANGES = {"admin": (1, 9), "hr": (10, 19), "employee": (20, float("inf"
 # Remove devices that have not sent a heartbeat within this period.
 DEVICE_TIMEOUT_SECONDS = 90
 
-# Add CORS and no-cache headers to API responses.
-@app.after_request
-def add_cors_headers(response):
-    origin = request.headers.get("Origin")
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie, Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
-    if request.path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-store"
-    return response
-
 # Track the latest status reported by each RFID device.
 device_status = {}
 
@@ -75,8 +62,9 @@ latest_employee = {
     "cpnumber": None,
     "email": None,
     "username": None,
-    "password_hash": None,
     "role": None,
+    "department": None,
+    "position": None,
     "image": None,
     "timestamp_creation": None,
     "timestamp_modified": None
@@ -391,6 +379,40 @@ def verify_token():
         return None, jsonify({"status": "error", "message": "Invalid token"}), 401
 
 ## Routes
+# Add CORS and no-cache headers to API responses.
+@app.after_request
+def add_cors_headers(response):
+    origin = request.headers.get("Origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Cookie, Set-Cookie, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
+    if request.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+# Serve HTML pages
+@app.route('/')
+def serve_index():
+    return send_file('login.html')
+
+@app.route('/login.html')
+def serve_login():
+    return send_file('login.html')
+
+@app.route('/pages/<path:filename>')
+def serve_pages(filename):
+    return send_file(f'pages/{filename}')
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    return send_file(f'css/{filename}')
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    return send_file(f'js/{filename}')
+
 # Register a new admin, HR, or employee account.
 @app.route("/api/register-employee", methods=["POST"])
 def register_employee():
