@@ -2,7 +2,16 @@ const dashboardApiBaseUrl = window.TAPIN_API_URL || 'https://tapin-api.up.railwa
 
 function redirectToLogin() {
     localStorage.removeItem('tapinUser');
+    localStorage.removeItem('tapinToken');
     window.location.replace('../login.html');
+}
+
+function getAuthHeaders() {
+    const token = localStorage.getItem('tapinToken');
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
 }
 
 function updateUserDisplay(user) {
@@ -110,6 +119,8 @@ function updateAttendanceTable(scans) {
 async function loadDashboardData() {
     try {
         const response = await fetch(`${dashboardApiBaseUrl}/api/dashboard-data`, {
+            method: 'GET',
+            headers: getAuthHeaders(),
             credentials: 'include',
             cache: 'no-store'
         });
@@ -140,8 +151,19 @@ async function loadDashboardData() {
 }
 
 async function verifyDashboardSession() {
+    const token = localStorage.getItem('tapinToken');
+    if (!token) {
+        redirectToLogin();
+        return;
+    }
+    
     try {
-        const response = await fetch(`${dashboardApiBaseUrl}/api/session`, {
+        const response = await fetch(`${dashboardApiBaseUrl}/api/verify-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             credentials: 'include',
             cache: 'no-store'
         });
@@ -164,10 +186,13 @@ if (logoutLink) {
         try {
             await fetch(`${dashboardApiBaseUrl}/api/logout`, {
                 method: 'POST',
+                headers: getAuthHeaders(),
                 credentials: 'include'
             });
         } finally {
-            redirectToLogin();
+            localStorage.removeItem('tapinToken');
+            localStorage.removeItem('tapinUser');
+            window.location.replace('../login.html');
         }
     });
 }

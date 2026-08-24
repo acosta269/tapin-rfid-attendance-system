@@ -8,9 +8,18 @@ const passwordToggle = form ? document.getElementById('passwordToggle') : null;
 const passwordToggleIcon = passwordToggle ? passwordToggle.querySelector('i') : null;
 
 async function checkAlreadyLoggedIn() {
+    const token = localStorage.getItem('tapinToken');
+    if (!token) {
+        return;
+    }
+    
     try {
-        const response = await fetch(`${apiBaseUrl}/api/session`, {
-            credentials: 'include',
+        const response = await fetch(`${apiBaseUrl}/api/verify-token`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             cache: 'no-store'
         });
         if (response.ok) {
@@ -90,6 +99,7 @@ if (form) {
             }
 
             localStorage.setItem('tapinUser', JSON.stringify(result.user));
+            localStorage.setItem('tapinToken', result.token);
 
             // Use the redirect URL from the server
             const dashboardUrl = new URL(result.redirect, window.location.origin);
