@@ -4,10 +4,11 @@
 import machine
 import utime as time
 import ujson as json
-import urequests as requests
 import ntptime
 import network
 import sys
+import ssl
+import usocket
 
 from boot import *
 from configs.config import *
@@ -54,63 +55,82 @@ def check_internet_connection():
             return False
 
 def check_api_connectivity():
-    """Check if API is reachable using HTTPS directly (avoid redirects)"""
+    """Check if API is reachable using raw socket with SSL"""
     try:
-        # Use HTTPS directly to avoid redirect issues
-        url = "https://tapin-api.up.railway.app/api/device-ping"
-        response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
-        status = response.status_code
-        response.close()
-        if status == 200:
+        addr = usocket.getaddrinfo(API_ADDR, 443)[0][-1]
+        s = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(addr)
+        # Wrap the connected socket with SSL
+        s = ssl.wrap_socket(s)
+        
+        data = '{"device_id":"' + param.DEVICE_ID + '","status":"test"}'
+        request = (
+            "POST /api/device-ping HTTP/1.1\r\n"
+            "Host: " + API_ADDR + "\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: " + str(len(data)) + "\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            + data
+        )
+        
+        s.write(request.encode())
+        response = s.read(200)
+        s.close()
+        
+        if b"200" in response:
             return True
         return False
     except:
-        # Fallback to HTTP check
-        try:
-            url = "http://tapin-api.up.railway.app/api/device-ping"
-            response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
-            status = response.status_code
-            response.close()
-            if status == 200:
-                return True
-            return False
-        except:
-            return False
+        return False
 
 def test_api_connection():
-    """Test API connection before starting main loop using HTTPS directly"""
+    """Test API connection before starting main loop using raw socket with SSL"""
     if not check_wifi_connection():
         return False
         
-    # Try HTTPS directly first (this avoids the redirect)
     try:
-        url = "https://tapin-api.up.railway.app/api/device-ping"
-        tprint(PRINTSTATUS.INFO, f"Testing API connection (HTTPS): {url}")
-        response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
-        status = response.status_code
-        tprint(PRINTSTATUS.INFO, f"API test response: {status}")
-        response.close()
-        if status == 200:
-            tprint(PRINTSTATUS.SUCCESS, "API connection OK (HTTPS)")
+        tprint(PRINTSTATUS.INFO, "Testing API connection...")
+        addr = usocket.getaddrinfo(API_ADDR, 443)[0][-1]
+        s = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(addr)
+        # Wrap the connected socket with SSL
+        s = ssl.wrap_socket(s)
+        
+        data = '{"device_id":"' + param.DEVICE_ID + '","status":"test"}'
+        request = (
+            "POST /api/device-ping HTTP/1.1\r\n"
+            "Host: " + API_ADDR + "\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: " + str(len(data)) + "\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            + data
+        )
+        
+        tprint(PRINTSTATUS.INFO, f"Testing API: https://{API_ADDR}/api/device-ping")
+        s.write(request.encode())
+        response = s.read(200)
+        s.close()
+        
+        if b"200" in response:
+            tprint(PRINTSTATUS.SUCCESS, "API connection OK")
             return True
+        else:
+            # Try to extract status code
+            try:
+                response_str = response.decode()
+                if "HTTP/1.1" in response_str:
+                    status_line = response_str.split("\r\n")[0]
+                    tprint(PRINTSTATUS.INFO, f"Response: {status_line}")
+            except:
+                tprint(PRINTSTATUS.INFO, f"Response: {response[:50]}")
+            return False
     except Exception as e:
-        tprint(PRINTSTATUS.WARN, f"HTTPS test failed: {str(e)}")
-    
-    # Fallback to HTTP with redirect handling
-    try:
-        url = "http://tapin-api.up.railway.app/api/device-ping"
-        tprint(PRINTSTATUS.INFO, f"Testing API connection (HTTP): {url}")
-        response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
-        status = response.status_code
-        tprint(PRINTSTATUS.INFO, f"API test response: {status}")
-        response.close()
-        if status == 200:
-            tprint(PRINTSTATUS.SUCCESS, "API connection OK (HTTP)")
-            return True
-    except Exception as e:
-        tprint(PRINTSTATUS.WARN, f"HTTP test failed: {str(e)}")
-            
-    return False
+        tprint(PRINTSTATUS.ERROR, f"API connection test failed: {str(e)}")
+        return False
 
 def restart_device():
     """Restart the device"""
@@ -141,48 +161,46 @@ def restart_device():
     machine.reset()
 
 def send_ping():
-    """Send device ping using HTTPS directly (avoids 301 redirect)"""
+    """Send device ping using raw socket with SSL"""
     if not check_wifi_connection():
         return False
         
-    # Try HTTPS first - this avoids the redirect entirely
-    url = "https://tapin-api.up.railway.app/api/device-ping"
-    headers = {"Content-Type": "application/json"}
-    
     try:
-        tprint(PRINTSTATUS.INFO, f"Sending ping via HTTPS: {url}")
-        response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "alive"}, headers=headers, timeout=10)
-        status = response.status_code
-        tprint(PRINTSTATUS.INFO, f"Ping response status: {status}")
-        response.close()
-        if status == 200:
+        addr = usocket.getaddrinfo(API_ADDR, 443)[0][-1]
+        s = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(addr)
+        # Wrap the connected socket with SSL
+        s = ssl.wrap_socket(s)
+        
+        data = '{"device_id":"' + param.DEVICE_ID + '","status":"alive"}'
+        request = (
+            "POST /api/device-ping HTTP/1.1\r\n"
+            "Host: " + API_ADDR + "\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: " + str(len(data)) + "\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            + data
+        )
+        
+        tprint(PRINTSTATUS.INFO, f"Sending ping: https://{API_ADDR}/api/device-ping")
+        s.write(request.encode())
+        response = s.read(200)
+        s.close()
+        
+        if b"200" in response:
             tprint(PRINTSTATUS.INFO, "Ping sent: Device alive")
             return True
         else:
-            tprint(PRINTSTATUS.WARN, f"Ping returned status: {status}")
+            tprint(PRINTSTATUS.WARN, f"Ping returned: {response[:50]}")
             return False
     except Exception as e:
-        tprint(PRINTSTATUS.WARN, f"HTTPS ping failed: {str(e)}")
-        
-        # Fallback to HTTP (will get 301 redirect)
-        try:
-            url = "http://tapin-api.up.railway.app/api/device-ping"
-            tprint(PRINTSTATUS.INFO, f"Trying HTTP ping: {url}")
-            response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "alive"}, headers=headers, timeout=10)
-            status = response.status_code
-            tprint(PRINTSTATUS.INFO, f"HTTP ping response: {status}")
-            response.close()
-            # Only accept 200 - 301/302 means redirect (data not saved)
-            if status == 200:
-                tprint(PRINTSTATUS.INFO, "Ping sent via HTTP")
-                return True
-            return False
-        except Exception as e2:
-            tprint(PRINTSTATUS.ERROR, f"HTTP ping failed: {str(e2)}")
-            return False
+        tprint(PRINTSTATUS.ERROR, f"Ping failed: {str(e)}")
+        return False
 
 def post_data(rfid_str):
-    """Send RFID data using HTTPS directly (avoids 301 redirect issues)"""
+    """Send RFID data using raw socket with SSL"""
     if not check_wifi_connection():
         return False
         
@@ -191,66 +209,42 @@ def post_data(rfid_str):
         t[0], t[1], t[2], t[3], t[4], t[5]
     )
     
-    data = {
-        "rfid": rfid_str,
-        "scanned_at": scanned_time
-    }
-    headers = {"Content-Type": "application/json"}
-    
-    # Try HTTPS first - this avoids the 301 redirect entirely
-    url = "https://tapin-api.up.railway.app/api/receive-rfid"
+    data = '{"rfid":"' + rfid_str + '","scanned_at":"' + scanned_time + '"}'
     
     try:
-        tprint(PRINTSTATUS.INFO, f"Sending RFID via HTTPS: {url}")
-        tprint(PRINTSTATUS.INFO, f"Data: {json.dumps(data)}")
-        r = requests.post(url, json=data, headers=headers, timeout=10)
-        status = r.status_code
-        tprint(PRINTSTATUS.INFO, f"HTTPS response status: {status}")
+        # Display the URL being sent to (similar to ping)
+        tprint(PRINTSTATUS.INFO, f"Sending RFID: https://{API_ADDR}/api/receive-rfid")
+        tprint(PRINTSTATUS.INFO, f"Data: {data}")
         
-        # Try to get response
-        try:
-            response_text = r.text
-            if response_text:
-                tprint(PRINTSTATUS.INFO, f"Response: {response_text[:200]}")
-        except:
-            pass
-        r.close()
+        addr = usocket.getaddrinfo(API_ADDR, 443)[0][-1]
+        s = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(addr)
+        # Wrap the connected socket with SSL
+        s = ssl.wrap_socket(s)
         
-        # Only accept 200 - this means the data was actually saved
-        if status == 200:
-            tprint(PRINTSTATUS.SUCCESS, "RFID sent successfully via HTTPS")
+        request = (
+            "POST /api/receive-rfid HTTP/1.1\r\n"
+            "Host: " + API_ADDR + "\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: " + str(len(data)) + "\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            + data
+        )
+        
+        s.write(request.encode())
+        response = s.read(200)
+        s.close()
+        
+        if b"200" in response:
+            tprint(PRINTSTATUS.SUCCESS, "RFID sent successfully (200 OK)")
             return True
         else:
-            tprint(PRINTSTATUS.WARN, f"HTTPS returned {status} (not 200)")
+            tprint(PRINTSTATUS.WARN, f"RFID send returned: {response[:50]}")
             return False
     except Exception as e:
-        tprint(PRINTSTATUS.WARN, f"HTTPS send failed: {str(e)}")
-    
-    # Fallback to HTTP - the server will redirect to HTTPS
-    try:
-        url = "http://tapin-api.up.railway.app/api/receive-rfid"
-        tprint(PRINTSTATUS.INFO, f"Trying HTTP fallback: {url}")
-        r = requests.post(url, json=data, headers=headers, timeout=10)
-        status = r.status_code
-        tprint(PRINTSTATUS.INFO, f"HTTP response status: {status}")
-        
-        try:
-            response_text = r.text
-            if response_text:
-                tprint(PRINTSTATUS.INFO, f"Response: {response_text[:200]}")
-        except:
-            pass
-        r.close()
-        
-        # Only accept 200 - 301/302 means redirect, data NOT saved
-        if status == 200:
-            tprint(PRINTSTATUS.SUCCESS, f"RFID sent successfully (status: {status})")
-            return True
-        else:
-            tprint(PRINTSTATUS.WARN, f"RFID send returned: {status} (not 200)")
-            return False
-    except Exception as e:
-        tprint(PRINTSTATUS.ERROR, f"HTTP send failed: {str(e)}")
+        tprint(PRINTSTATUS.ERROR, f"Send error: {str(e)}")
         return False
 
 def sync_manila_time():
@@ -454,7 +448,6 @@ def main():
     sync_manila_time()
 
     # Test API connection - restart if fails
-    tprint(PRINTSTATUS.INFO, "Testing API connection...")
     if not test_api_connection():
         tprint(PRINTSTATUS.ERROR, "API connection failed! Restarting...")
         time.sleep_ms(2000)
@@ -602,18 +595,15 @@ def main():
                                 last_status_time = current_time  # Track when status was shown
                             except:
                                 pass
-                            tprint(PRINTSTATUS.SUCCESS, "RFID sent successfully (200 OK)")
                         else:
-                            # Failed - show ER (for 301, 302, or any error)
+                            # Failed - show ER (for any non-200 response)
                             try:
                                 lcd.move_to(14, 1)
                                 lcd.putstr("ER")
                                 last_status_time = current_time  # Track when status was shown
                             except:
                                 pass
-                            tprint(PRINTSTATUS.ERROR, "RFID send failed (not 200)")
                     else:
-                        tprint(PRINTSTATUS.ERROR, "Cannot send RFID - No internet")
                         try:
                             lcd.move_to(14, 1)
                             lcd.putstr("! ")
