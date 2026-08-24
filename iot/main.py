@@ -54,30 +54,63 @@ def check_internet_connection():
             return False
 
 def check_api_connectivity():
-    """Check if API is reachable - with SSL disabled"""
+    """Check if API is reachable using HTTPS directly (avoid redirects)"""
     try:
-        url = API_URL.rstrip("/") + "/api/device-ping"
+        # Use HTTPS directly to avoid redirect issues
+        url = "https://tapin-api.up.railway.app/api/device-ping"
         response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
+        status = response.status_code
         response.close()
-        return True
-    except:
+        if status == 200:
+            return True
         return False
+    except:
+        # Fallback to HTTP check
+        try:
+            url = "http://tapin-api.up.railway.app/api/device-ping"
+            response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
+            status = response.status_code
+            response.close()
+            if status == 200:
+                return True
+            return False
+        except:
+            return False
 
 def test_api_connection():
-    """Test API connection before starting main loop - with SSL disabled"""
+    """Test API connection before starting main loop using HTTPS directly"""
     if not check_wifi_connection():
         return False
         
+    # Try HTTPS directly first (this avoids the redirect)
     try:
-        url = API_URL.rstrip("/") + "/api/device-ping"
-        tprint(PRINTSTATUS.INFO, f"Testing API connection: {url}")
+        url = "https://tapin-api.up.railway.app/api/device-ping"
+        tprint(PRINTSTATUS.INFO, f"Testing API connection (HTTPS): {url}")
         response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
-        tprint(PRINTSTATUS.INFO, f"API test response: {response.status_code}")
+        status = response.status_code
+        tprint(PRINTSTATUS.INFO, f"API test response: {status}")
         response.close()
-        return True
+        if status == 200:
+            tprint(PRINTSTATUS.SUCCESS, "API connection OK (HTTPS)")
+            return True
     except Exception as e:
-        tprint(PRINTSTATUS.ERROR, f"API connection test failed: {str(e)}")
-        return False
+        tprint(PRINTSTATUS.WARN, f"HTTPS test failed: {str(e)}")
+    
+    # Fallback to HTTP with redirect handling
+    try:
+        url = "http://tapin-api.up.railway.app/api/device-ping"
+        tprint(PRINTSTATUS.INFO, f"Testing API connection (HTTP): {url}")
+        response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "test"}, timeout=5)
+        status = response.status_code
+        tprint(PRINTSTATUS.INFO, f"API test response: {status}")
+        response.close()
+        if status == 200:
+            tprint(PRINTSTATUS.SUCCESS, "API connection OK (HTTP)")
+            return True
+    except Exception as e:
+        tprint(PRINTSTATUS.WARN, f"HTTP test failed: {str(e)}")
+            
+    return False
 
 def restart_device():
     """Restart the device"""
@@ -104,39 +137,55 @@ def restart_device():
     except:
         pass
     
-    time.sleep_ms(2000)  # Give time to see the message
+    time.sleep_ms(2000)
     machine.reset()
 
 def send_ping():
-    """Send device ping with SSL disabled"""
+    """Send device ping using HTTPS directly (avoids 301 redirect)"""
     if not check_wifi_connection():
         return False
         
-    url = API_URL.rstrip("/") + "/api/device-ping"
+    # Try HTTPS first - this avoids the redirect entirely
+    url = "https://tapin-api.up.railway.app/api/device-ping"
     headers = {"Content-Type": "application/json"}
+    
     try:
-        # Using HTTP request without SSL verification
+        tprint(PRINTSTATUS.INFO, f"Sending ping via HTTPS: {url}")
         response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "alive"}, headers=headers, timeout=10)
         status = response.status_code
+        tprint(PRINTSTATUS.INFO, f"Ping response status: {status}")
         response.close()
-        # Accept 200, 301, 302 as success (redirects are fine)
-        if status in [200, 301, 302]:
+        if status == 200:
             tprint(PRINTSTATUS.INFO, "Ping sent: Device alive")
             return True
         else:
             tprint(PRINTSTATUS.WARN, f"Ping returned status: {status}")
             return False
     except Exception as e:
-        tprint(PRINTSTATUS.ERROR, f"Ping failed: {str(e)}")
-        return False
+        tprint(PRINTSTATUS.WARN, f"HTTPS ping failed: {str(e)}")
+        
+        # Fallback to HTTP (will get 301 redirect)
+        try:
+            url = "http://tapin-api.up.railway.app/api/device-ping"
+            tprint(PRINTSTATUS.INFO, f"Trying HTTP ping: {url}")
+            response = requests.post(url, json={"device_id": param.DEVICE_ID, "status": "alive"}, headers=headers, timeout=10)
+            status = response.status_code
+            tprint(PRINTSTATUS.INFO, f"HTTP ping response: {status}")
+            response.close()
+            # Only accept 200 - 301/302 means redirect (data not saved)
+            if status == 200:
+                tprint(PRINTSTATUS.INFO, "Ping sent via HTTP")
+                return True
+            return False
+        except Exception as e2:
+            tprint(PRINTSTATUS.ERROR, f"HTTP ping failed: {str(e2)}")
+            return False
 
 def post_data(rfid_str):
-    """Send RFID data with SSL disabled - handles redirects"""
+    """Send RFID data using HTTPS directly (avoids 301 redirect issues)"""
     if not check_wifi_connection():
         return False
         
-    url = API_URL.rstrip("/") + "/api/receive-rfid"
-    headers = {"Content-Type": "application/json"}   
     t = time.localtime()
     scanned_time = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
         t[0], t[1], t[2], t[3], t[4], t[5]
@@ -146,32 +195,62 @@ def post_data(rfid_str):
         "rfid": rfid_str,
         "scanned_at": scanned_time
     }
+    headers = {"Content-Type": "application/json"}
+    
+    # Try HTTPS first - this avoids the 301 redirect entirely
+    url = "https://tapin-api.up.railway.app/api/receive-rfid"
     
     try:
-        tprint(PRINTSTATUS.INFO, f"Sending RFID to: {url}")
+        tprint(PRINTSTATUS.INFO, f"Sending RFID via HTTPS: {url}")
+        tprint(PRINTSTATUS.INFO, f"Data: {json.dumps(data)}")
         r = requests.post(url, json=data, headers=headers, timeout=10)
         status = r.status_code
-        tprint(PRINTSTATUS.INFO, f"RFID response status: {status}")
+        tprint(PRINTSTATUS.INFO, f"HTTPS response status: {status}")
         
-        # Try to get response content for debugging
+        # Try to get response
         try:
             response_text = r.text
             if response_text:
-                tprint(PRINTSTATUS.INFO, f"Response: {response_text[:100]}")
+                tprint(PRINTSTATUS.INFO, f"Response: {response_text[:200]}")
         except:
             pass
-            
         r.close()
         
-        # Accept 200, 301, 302 as success (redirects are fine)
-        # 301/302 means Railway is redirecting HTTP to HTTPS
-        if status in [200, 301, 302]:
+        # Only accept 200 - this means the data was actually saved
+        if status == 200:
+            tprint(PRINTSTATUS.SUCCESS, "RFID sent successfully via HTTPS")
             return True
         else:
-            tprint(PRINTSTATUS.WARN, f"RFID send returned status: {status}")
+            tprint(PRINTSTATUS.WARN, f"HTTPS returned {status} (not 200)")
             return False
     except Exception as e:
-        tprint(PRINTSTATUS.ERROR, f"Send error: {str(e)}")
+        tprint(PRINTSTATUS.WARN, f"HTTPS send failed: {str(e)}")
+    
+    # Fallback to HTTP - the server will redirect to HTTPS
+    try:
+        url = "http://tapin-api.up.railway.app/api/receive-rfid"
+        tprint(PRINTSTATUS.INFO, f"Trying HTTP fallback: {url}")
+        r = requests.post(url, json=data, headers=headers, timeout=10)
+        status = r.status_code
+        tprint(PRINTSTATUS.INFO, f"HTTP response status: {status}")
+        
+        try:
+            response_text = r.text
+            if response_text:
+                tprint(PRINTSTATUS.INFO, f"Response: {response_text[:200]}")
+        except:
+            pass
+        r.close()
+        
+        # Only accept 200 - 301/302 means redirect, data NOT saved
+        if status == 200:
+            tprint(PRINTSTATUS.SUCCESS, f"RFID sent successfully (status: {status})")
+            return True
+        else:
+            tprint(PRINTSTATUS.WARN, f"RFID send returned: {status} (not 200)")
+            return False
+    except Exception as e:
+        tprint(PRINTSTATUS.ERROR, f"HTTP send failed: {str(e)}")
         return False
 
 def sync_manila_time():
@@ -180,12 +259,23 @@ def sync_manila_time():
         return False
         
     try:
-        ntptime.host = "pool.ntp.org"
-        ntptime.settime()
-        t = time.localtime(time.time() + 8 * 3600)
-        machine.RTC().datetime((t[0], t[1], t[2], t[6] + 1, t[3], t[4], t[5], 0))
-        tprint(PRINTSTATUS.SUCCESS, "Manila Time Synced")
-        return True
+        # Try multiple NTP servers
+        ntp_servers = ["pool.ntp.org", "time.google.com", "time.windows.com", "ntp.aliyun.com"]
+        for server in ntp_servers:
+            try:
+                tprint(PRINTSTATUS.INFO, f"Trying NTP: {server}")
+                ntptime.host = server
+                ntptime.settime()
+                t = time.localtime(time.time() + 8 * 3600)
+                machine.RTC().datetime((t[0], t[1], t[2], t[6] + 1, t[3], t[4], t[5], 0))
+                tprint(PRINTSTATUS.SUCCESS, f"Manila Time Synced via {server}")
+                return True
+            except Exception as e:
+                tprint(PRINTSTATUS.WARN, f"NTP {server} failed: {str(e)}")
+                continue
+        
+        tprint(PRINTSTATUS.ERROR, "All NTP servers failed")
+        return False
     except Exception as e:
         tprint(PRINTSTATUS.ERROR, f"Time Sync Failed: {str(e)}")
         return False
@@ -304,6 +394,22 @@ def hardware_failsafe_indicator():
     except:
         pass
 
+def clear_status():
+    """Clear only the status indicators (OK/ER/!) from LCD row 1, positions 14-15"""
+    try:
+        lcd.move_to(14, 1)
+        lcd.putstr("  ")  # Two spaces to clear OK/ER/!
+    except:
+        pass
+
+def reset_lcd_to_ready():
+    """Reset LCD second row to 'Scan RFID Card'"""
+    try:
+        lcd.move_to(0, 1)
+        lcd.putstr("Scan RFID Card")
+    except:
+        pass
+
 ## Main function
 def main():
     global buzzer, lcd, rfid, no_internet_count
@@ -355,12 +461,17 @@ def main():
         machine.reset()
 
     # NORMAL OPERATION
-    last_rfid = None
-    last_ping = time.ticks_ms()
-    last_time_update = time.ticks_ms()
-    last_internet_check = time.ticks_ms()
-    ping_retry_count = 0
-    max_ping_retries = 3
+    last_rfid = None                                # Track last scanned RFID to prevent duplicates
+    last_rfid_time = 0                              # Track last time a specific RFID was scanned
+    last_scan_time = 0                              # Track last time ANY RFID was scanned (for clearing status)
+    last_status_time = 0                            # Track when status (OK/ER) was shown
+    ping_retry_count = 0                            # Track consecutive ping failures
+    max_ping_retries = 3                            # Max retries before restart
+    timer_delay = 8000                              # 8 seconds for status clear, cooldown, and display reset
+
+    last_ping = time.ticks_ms()                     # Track last ping time
+    last_time_update = time.ticks_ms()              # Track last time update for LCD
+    last_internet_check = time.ticks_ms()           # Track last internet check time
 
     tprint(PRINTSTATUS.SUCCESS, "Device Ready.")
     
@@ -419,6 +530,22 @@ def main():
                 lcd.putstr(time_str)
             except:
                 pass
+            
+            # Check if we need to clear status after 8 seconds
+            if last_status_time > 0:
+                time_since_status = time.ticks_diff(current_time, last_status_time)
+                if time_since_status >= timer_delay:
+                    clear_status()
+                    last_status_time = 0
+            
+            # Check if we need to reset display after 8 seconds of no scan
+            if last_scan_time > 0:
+                time_since_last_scan = time.ticks_diff(current_time, last_scan_time)
+                if time_since_last_scan >= timer_delay:
+                    reset_lcd_to_ready()
+                    last_scan_time = 0  # Reset so we don't keep resetting
+                    # Reset last_rfid so the next scan shows as new
+                    last_rfid = None
 
         # 4. Read RFID
         try:
@@ -426,8 +553,25 @@ def main():
             if uid and len(uid) >= 4:
                 rfid_str = "".join("{:02X}".format(b) for b in uid)
 
-                if rfid_str != last_rfid:
+                # Check if this is a new RFID or same RFID but cooldown expired
+                is_new_rfid = (rfid_str != last_rfid)
+                is_cooldown_expired = False
+                
+                if not is_new_rfid:
+                    # Same RFID - check cooldown
+                    time_since_last_scan = time.ticks_diff(current_time, last_rfid_time)
+                    if time_since_last_scan >= timer_delay:
+                        is_cooldown_expired = True
+                        tprint(PRINTSTATUS.INFO, f"Cooldown expired for RFID: {rfid_str}")
+                    else:
+                        remaining = (timer_delay - time_since_last_scan) // 1000
+                        tprint(PRINTSTATUS.INFO, f"Cooldown active for RFID: {rfid_str} ({remaining}s remaining)")
+                
+                # Process RFID if it's new OR cooldown expired
+                if is_new_rfid or is_cooldown_expired:
                     last_rfid = rfid_str
+                    last_rfid_time = current_time
+                    last_scan_time = current_time  # Update last scan time for display reset
                     tprint(PRINTSTATUS.INFO, "RFID: " + rfid_str)
 
                     # Buzzer beep after successful scan
@@ -451,26 +595,29 @@ def main():
                     # Send RFID data to API - Show status on LCD
                     if check_wifi_connection() and check_internet_connection():
                         if post_data(rfid_str):
-                            # Success - show OK
+                            # Success - show OK (only when status 200)
                             try:
                                 lcd.move_to(14, 1)
                                 lcd.putstr("OK")
+                                last_status_time = current_time  # Track when status was shown
                             except:
                                 pass
-                            tprint(PRINTSTATUS.SUCCESS, "RFID sent successfully")
+                            tprint(PRINTSTATUS.SUCCESS, "RFID sent successfully (200 OK)")
                         else:
-                            # Failed - show ER
+                            # Failed - show ER (for 301, 302, or any error)
                             try:
                                 lcd.move_to(14, 1)
                                 lcd.putstr("ER")
+                                last_status_time = current_time  # Track when status was shown
                             except:
                                 pass
-                            tprint(PRINTSTATUS.ERROR, "RFID send failed")
+                            tprint(PRINTSTATUS.ERROR, "RFID send failed (not 200)")
                     else:
                         tprint(PRINTSTATUS.ERROR, "Cannot send RFID - No internet")
                         try:
                             lcd.move_to(14, 1)
                             lcd.putstr("! ")
+                            last_status_time = current_time  # Track when status was shown
                         except:
                             pass
 
