@@ -214,19 +214,17 @@ def main():
             if rfid_str != last_rfid:
                 last_rfid = rfid_str
                 tprint(PRINTSTATUS.INFO, "RFID: " + rfid_str)
-
-                # Buzzer beep after successful scan
-                buzzer.on()
-                time.sleep_ms(150)
-                buzzer.off()
-
+                post_data(rfid_str)
                 display_str = "RFID:" + rfid_str
                 while len(display_str) < 16:
                     display_str = display_str + " "
                 lcd.move_to(0, 1)
                 lcd.putstr(display_str)
 
-                post_data(rfid_str)
+                # Buzzer beep after successful scan
+                buzzer.on()
+                time.sleep_ms(150)
+                buzzer.off()
 
         time.sleep_ms(200)
 
