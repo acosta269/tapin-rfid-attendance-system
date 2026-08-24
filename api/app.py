@@ -29,10 +29,16 @@ app.config.update(
     SESSION_COOKIE_NAME='tapin_session'
 )
 
-# Store user records in the database folder.
-USER_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "users.json")
+# Get the base directory (parent folder of the app folder)
+# app.py is in /app/ folder, so we go up one level to reach storage
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Store user records in the storage/database folder (outside app folder)
+USER_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "users.json")
 # Store every received RFID scan and timestamp.
-ATTENDANCE_DATA_FILE = os.path.join(os.path.dirname(__file__), "database", "attendance.json")
+ATTENDANCE_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "attendance.json")
+# Profile images storage
+PROFILE_STORAGE = os.path.join(BASE_DIR, "storage", "profiles")
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
 EMPLOYEE_DASHBOARD = "/pages/employee-dashboard.html"
@@ -78,14 +84,26 @@ latest_scan = {
 
 # Load persisted DTR records and scan events.
 def load_attendance_data():
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(ATTENDANCE_DATA_FILE), exist_ok=True)
+    
     if not os.path.exists(ATTENDANCE_DATA_FILE):
-        return {"records": [], "scan_events": []}
+        # Create empty file with proper structure
+        default_data = {"records": [], "scan_events": []}
+        with open(ATTENDANCE_DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, indent=4)
+            f.write("\n")
+        return default_data
+    
     try:
         with open(ATTENDANCE_DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
+            # Ensure we have the proper structure
             if isinstance(data, list):
+                # Old format - convert to new structure
                 return {"records": [], "scan_events": data}
             if "dtr" in data:
+                # Handle old DTR format
                 working_days = list(data.get("dtr", {}).values())
                 template_record = {
                     "id": data.get("id") or "001",
@@ -105,13 +123,25 @@ def load_attendance_data():
                     "records": [template_record] if template_record["uid"] else [],
                     "scan_events": []
                 }
+            # Modern structure
             return {
                 "records": data.get("records", []),
                 "scan_events": data.get("scan_events", [])
             }
-    except (OSError, ValueError):
+    except (OSError, ValueError, json.JSONDecodeError) as e:
+        print(f"Error reading attendance file: {e}")
+        # Backup the corrupted file if it exists
+        if os.path.exists(ATTENDANCE_DATA_FILE):
+            backup_file = ATTENDANCE_DATA_FILE + ".backup"
+            try:
+                os.rename(ATTENDANCE_DATA_FILE, backup_file)
+                print(f"Corrupted file backed up to: {backup_file}")
+            except:
+                pass
+        # Return empty structure
         return {"records": [], "scan_events": []}
 
+# Load attendance data
 attendance_data = load_attendance_data()
 attendance_records = attendance_data["records"]
 scan_events = attendance_data["scan_events"]
@@ -124,10 +154,23 @@ if scan_events:
 ## Functions
 # Save DTR records and scan history to the attendance database.
 def save_attendance_data():
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(ATTENDANCE_DATA_FILE), exist_ok=True)
+    
+    # Create backup before saving
+    if os.path.exists(ATTENDANCE_DATA_FILE):
+        backup_file = ATTENDANCE_DATA_FILE + ".backup"
+        try:
+            import shutil
+            shutil.copy2(ATTENDANCE_DATA_FILE, backup_file)
+        except:
+            pass
+    
+    # Save with proper structure
     with open(ATTENDANCE_DATA_FILE, "w", encoding="utf-8") as f:
         json.dump({
             "records": attendance_records,
-            "scan_events": scan_events[-10000:]
+            "scan_events": scan_events[-10000:]  # Keep last 10000 events
         }, f, indent=4)
         f.write("\n")
 
@@ -152,10 +195,19 @@ def build_working_days(year, month):
 def get_attendance_record(employee, scan_date):
     month_key = scan_date.strftime("%Y-%m")
     
+    # First try to find existing record
     for record in attendance_records:
         if record.get("uid") == employee.get("uid") and record.get("month") == month_key:
             return record
 
+    # Check if we have any existing working days for this user for this month
+    # This prevents creating duplicate records
+    existing_records = [r for r in attendance_records if r.get("uid") == employee.get("uid")]
+    for record in existing_records:
+        if record.get("month") == month_key:
+            return record
+    
+    # No record exists - create a new one
     # Generate a new unique ID based on the highest existing numeric ID
     existing_ids = [int(r.get("id", 0)) for r in attendance_records if str(r.get("id", "")).isdigit()]
     new_id = str(max(existing_ids + [0]) + 1).zfill(3)
@@ -182,11 +234,38 @@ def record_attendance_scan(employee, scanned_at):
     scan_time = parse_scan_time(scanned_at)
 
     record = get_attendance_record(employee, scan_time)
-    day_record = next(day for day in record["working_days"] if day["date"] == scan_time.strftime("%Y-%m-%d"))
+    
+    # Find the day record
+    day_date = scan_time.strftime("%Y-%m-%d")
+    day_record = None
+    for day in record["working_days"]:
+        if day["date"] == day_date:
+            day_record = day
+            break
+    
+    if not day_record:
+        # This shouldn't happen, but just in case
+        day_record = {
+            "date": day_date,
+            "day": calendar.day_abbr[scan_time.weekday()],
+            "am_in": "",
+            "am_out": "",
+            "pm_in": "",
+            "pm_out": "",
+            "hours": "0.00",
+            "ut": "0.00",
+            "ot": "0.00"
+        }
+        record["working_days"].append(day_record)
+        # Sort working days
+        record["working_days"].sort(key=lambda x: x["date"])
+    
     time_value = scan_time.strftime("%H:%M:%S")
     period = "am" if scan_time.hour < 12 else "pm"
     in_key = f"{period}_in"
     out_key = f"{period}_out"
+    
+    # Only add time if slot is empty (preserve existing data)
     if not day_record[in_key]:
         day_record[in_key] = time_value
     elif not day_record[out_key]:
@@ -214,38 +293,60 @@ def parse_scan_time(scanned_at):
 def calculate_hours(start_time, end_time):
     if not start_time or not end_time:
         return 0
-    start = datetime.strptime(start_time, "%H:%M:%S")
-    end = datetime.strptime(end_time, "%H:%M:%S")
-    return max(0, (end - start).total_seconds() / 3600)
+    try:
+        start = datetime.strptime(start_time, "%H:%M:%S")
+        end = datetime.strptime(end_time, "%H:%M:%S")
+        return max(0, (end - start).total_seconds() / 3600)
+    except:
+        return 0
 
 # Ensure every registered user has a DTR record for the current month.
 def initialize_attendance_records():
+    """Only adds missing records, never overwrites existing ones"""
     current_month = datetime.now()
     for employee in employee_database.values():
+        # This will only create a record if one doesn't exist
         get_attendance_record(employee, current_month)
     save_attendance_data()
 
 # Build the RFID lookup database from all user roles.
 def load_employee_database():
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(USER_DATA_FILE), exist_ok=True)
+    
     if not os.path.exists(USER_DATA_FILE):
-        print("File not found: database/users.json - database is empty")
+        print("File not found: storage/database/users.json - database is empty")
+        # Create empty file with proper structure
+        default_data = {"admin": [], "hr": [], "employees": []}
+        with open(USER_DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, indent=4)
+            f.write("\n")
         return {}
+    
     try:
         with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except Exception as e:
-        print("Error reading database/users.json:", str(e))
+    except (json.JSONDecodeError, OSError) as e:
+        print("Error reading storage/database/users.json:", str(e))
+        # Backup corrupted file
+        if os.path.exists(USER_DATA_FILE):
+            backup_file = USER_DATA_FILE + ".backup"
+            try:
+                os.rename(USER_DATA_FILE, backup_file)
+                print(f"Corrupted users.json backed up to: {backup_file}")
+            except:
+                pass
         return {}
 
     db = {}
     for category in ["admin", "hr", "employees"]:
-        if category in data:
+        if category in data and isinstance(data[category], list):
             for emp in data[category]:
                 rfid = emp.get("rfid", "").strip().upper()
                 if rfid:
                     emp["role"] = "employee" if category == "employees" else category
                     db[rfid] = emp
-        print("Loaded", len(db), "employees from database/users.json")
+    print("Loaded", len(db), "employees from storage/database/users.json")
     return db
 
 employee_database = load_employee_database()
@@ -275,7 +376,7 @@ def get_online_devices():
 # Calculate live attendance totals from today's recognized RFID scans.
 def get_dashboard_statistics():
     today = datetime.now().date()
-    today_events = [event for event in scan_events if event["scanned_on"] == today.isoformat()]
+    today_events = [event for event in scan_events if event.get("scanned_on") == today.isoformat()]
     employee_rfids = {
         emp.get("rfid", "").strip().upper()
         for emp in employee_database.values()
@@ -283,7 +384,7 @@ def get_dashboard_statistics():
     }
     present_rfids = {
         event["rfid"] for event in today_events
-        if event["rfid"] in employee_rfids
+        if event.get("rfid") in employee_rfids
     }
     total_employees = len(employee_rfids)
     present_today = len(present_rfids)
@@ -305,10 +406,10 @@ def get_dashboard_statistics():
 def get_dashboard_data():
     recent_scans = []
     for event in reversed(scan_events[-50:]):
-        employee = employee_database.get(event["rfid"])
+        employee = employee_database.get(event.get("rfid"))
         recent_scans.append({
-            "rfid": event["rfid"],
-            "scanned_at": event["scanned_at"],
+            "rfid": event.get("rfid"),
+            "scanned_at": event.get("scanned_at"),
             "found": bool(employee),
             "employee": {
                 "uid": employee.get("uid"),
@@ -413,6 +514,11 @@ def serve_css(filename):
 def serve_js(filename):
     return send_file(f'js/{filename}')
 
+# Serve profile images from storage folder (outside app)
+@app.route('/storage/profiles/<filename>')
+def serve_profile_image(filename):
+    return send_from_directory(PROFILE_STORAGE, filename)
+
 # Register a new admin, HR, or employee account.
 @app.route("/api/register-employee", methods=["POST"])
 def register_employee():
@@ -438,19 +544,21 @@ def register_employee():
         category = "employees" if role == "employee" else role
         image_file = request.files.get("image")
         image_path = ""
-        if image_file and image_file.filename:
-            extension = os.path.splitext(image_file.filename)[1].lower()
-            if extension not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
-                return jsonify({
-                    "status": "error",
-                    "message": "Image must be JPG, JPEG, PNG, GIF, or WEBP"
-                }), 400
-
-        with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
-            database = json.load(f)
+        
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(USER_DATA_FILE), exist_ok=True)
+        
+        # Read existing database
+        if os.path.exists(USER_DATA_FILE):
+            with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
+                database = json.load(f)
+        else:
+            database = {"admin": [], "hr": [], "employees": []}
 
         username = str(data.get("username", "")).strip()
         rfid = str(data.get("rfid", "")).strip().upper()
+        
+        # Check if RFID or username already exists
         if any(emp.get("rfid", "").strip().upper() == rfid or emp.get("username") == username
                for records in database.values() for emp in records):
             return jsonify({
@@ -468,12 +576,22 @@ def register_employee():
         role_uids = [value for value in employee_uids if uid_start <= value <= uid_end]
         uid = str(max([uid_start - 1] + role_uids) + 1).zfill(3)
 
+        # Handle image upload - save with RFID as filename in flat structure
         if image_file and image_file.filename:
-            employee_id_filename = secure_filename(str(data.get("employeeid", "")))
-            image_directory = os.path.join(os.path.dirname(__file__), "storage", "profiles", category, uid)
-            os.makedirs(image_directory, exist_ok=True)
-            image_file.save(os.path.join(image_directory, employee_id_filename + extension))
-            image_path = os.path.join("storage", "profiles", category, uid, employee_id_filename + extension).replace(os.sep, "/")
+            extension = os.path.splitext(image_file.filename)[1].lower()
+            if extension not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+                return jsonify({
+                    "status": "error",
+                    "message": "Image must be JPG, JPEG, PNG, GIF, or WEBP"
+                }), 400
+            
+            # Use RFID as the filename in flat profiles folder
+            rfid_filename = secure_filename(rfid)
+            os.makedirs(PROFILE_STORAGE, exist_ok=True)
+            
+            # Save image directly in profiles folder with RFID as filename
+            image_file.save(os.path.join(PROFILE_STORAGE, rfid_filename + extension))
+            image_path = os.path.join("storage", "profiles", rfid_filename + extension).replace(os.sep, "/")
 
         employee = {
             "uid": uid,
@@ -495,6 +613,12 @@ def register_employee():
             "timestamp_modified": now
         }
         database.setdefault(category, []).append(employee)
+        
+        # Save with backup
+        if os.path.exists(USER_DATA_FILE):
+            import shutil
+            shutil.copy2(USER_DATA_FILE, USER_DATA_FILE + ".backup")
+        
         with open(USER_DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(database, f, indent=4)
             f.write("\n")
@@ -511,6 +635,130 @@ def register_employee():
         return jsonify({
             "status": "error",
             "message": "Registration failed: " + str(e)
+        }), 500
+
+# Update employee data
+@app.route("/api/update-employee/<rfid>", methods=["PUT"])
+def update_employee(rfid):
+    try:
+        rfid = rfid.strip().upper()
+        data = request.form
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(USER_DATA_FILE), exist_ok=True)
+        
+        if not os.path.exists(USER_DATA_FILE):
+            return jsonify({
+                "status": "error",
+                "message": "Database file not found"
+            }), 404
+        
+        with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
+            database = json.load(f)
+        
+        # Find the employee in all categories
+        found = False
+        updated_employee = None
+        category_found = None
+        index_found = None
+        
+        for category in ["admin", "hr", "employees"]:
+            if category in database:
+                for idx, emp in enumerate(database[category]):
+                    if emp.get("rfid", "").strip().upper() == rfid:
+                        found = True
+                        category_found = category
+                        index_found = idx
+                        updated_employee = emp
+                        break
+                if found:
+                    break
+        
+        if not found:
+            return jsonify({
+                "status": "error",
+                "message": "Employee not found"
+            }), 404
+        
+        # Update fields
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Update basic fields (only if provided)
+        if "lastname" in data and data.get("lastname"):
+            updated_employee["lastname"] = str(data.get("lastname", "")).strip()
+        if "firstname" in data and data.get("firstname"):
+            updated_employee["firstname"] = str(data.get("firstname", "")).strip()
+        if "address" in data and data.get("address"):
+            updated_employee["address"] = str(data.get("address", "")).strip()
+        if "bdate" in data and data.get("bdate"):
+            updated_employee["bdate"] = str(data.get("bdate", "")).strip()
+        if "cpnumber" in data and data.get("cpnumber"):
+            updated_employee["cpnumber"] = str(data.get("cpnumber", "")).strip()
+        if "email" in data and data.get("email"):
+            updated_employee["email"] = str(data.get("email", "")).strip()
+        if "username" in data and data.get("username"):
+            updated_employee["username"] = str(data.get("username", "")).strip()
+        if "department" in data:
+            updated_employee["department"] = str(data.get("department", "")).strip()
+        if "position" in data:
+            updated_employee["position"] = str(data.get("position", "")).strip()
+        
+        # Update password if provided
+        if "password" in data and data.get("password"):
+            updated_employee["password_hash"] = hashlib.md5(str(data.get("password", "")).encode("utf-8")).hexdigest()
+        
+        # Update image if provided
+        image_file = request.files.get("image")
+        if image_file and image_file.filename:
+            extension = os.path.splitext(image_file.filename)[1].lower()
+            if extension not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+                return jsonify({
+                    "status": "error",
+                    "message": "Image must be JPG, JPEG, PNG, GIF, or WEBP"
+                }), 400
+            
+            # Delete old image if exists
+            old_image = updated_employee.get("image")
+            if old_image:
+                old_image_path = os.path.join(BASE_DIR, old_image)
+                if os.path.exists(old_image_path):
+                    try:
+                        os.remove(old_image_path)
+                    except:
+                        pass
+            
+            # Save new image with RFID as filename
+            rfid_filename = secure_filename(rfid)
+            os.makedirs(PROFILE_STORAGE, exist_ok=True)
+            image_file.save(os.path.join(PROFILE_STORAGE, rfid_filename + extension))
+            updated_employee["image"] = os.path.join("storage", "profiles", rfid_filename + extension).replace(os.sep, "/")
+        
+        # Update timestamp
+        updated_employee["timestamp_modified"] = now
+        
+        # Save back to database with backup
+        database[category_found][index_found] = updated_employee
+        
+        import shutil
+        shutil.copy2(USER_DATA_FILE, USER_DATA_FILE + ".backup")
+        
+        with open(USER_DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(database, f, indent=4)
+            f.write("\n")
+        
+        # Update in-memory database
+        employee_database[rfid] = updated_employee
+        
+        return jsonify({
+            "status": "success",
+            "message": "Employee updated successfully",
+            "data": updated_employee
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Update failed: " + str(e)
         }), 500
 
 # Authenticate all roles and create a three-hour session.
@@ -839,6 +1087,8 @@ def page_not_found(e):
 @app.route("/api/logout", methods=["OPTIONS"])
 @app.route("/api/dashboard-data", methods=["OPTIONS"])
 @app.route("/api/verify-token", methods=["OPTIONS"])
+@app.route("/api/register-employee", methods=["OPTIONS"])
+@app.route("/api/update-employee/<rfid>", methods=["OPTIONS"])
 def handle_options():
     response = jsonify({"status": "ok"})
     origin = request.headers.get("Origin")
@@ -852,5 +1102,6 @@ def handle_options():
 ## Main
 if __name__ == "__main__":
     # Initialize attendance records for all users at startup
+    # This only ADDS missing records, never overwrites existing ones
     initialize_attendance_records()
     app.run(host='0.0.0.0', port=5000, debug=True)

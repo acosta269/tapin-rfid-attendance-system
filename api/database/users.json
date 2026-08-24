@@ -2,7 +2,7 @@
     "admin": [
         {
             "uid": "001",
-            "rfid": "FFFFFFFF",
+            "rfid": "299A8B8E",
             "employeeid": "A01-0001",
             "lastname": "SYSTEM",
             "firstname": "ADMIN",
@@ -15,7 +15,7 @@
             "role": "admin",
             "position": null,
             "department": null,
-            "image": "storage/profiles/admin/001/admin-profile.jpg",
+            "image": "storage/profiles/299A8B8E.jpg",
             "timestamp_creation": "2026-08-03 15:00:00",
             "timestamp_modified": "2026-08-03 15:00:00"
         }
@@ -36,7 +36,7 @@
             "role": "hr",
             "position": null,
             "department": null,
-            "image": "storage/profiles/hr/010/maria-reyes.jpg",
+            "image": "storage/profiles/11223344.jpg",
             "timestamp_creation": "2026-08-03 15:10:00",
             "timestamp_modified": "2026-08-03 15:10:00"
         }
@@ -57,7 +57,7 @@
             "role": "employee",
             "position": null,
             "department": null,
-            "image": "storage/profiles/employees/020/juan-cruz.jpg",
+            "image": "storage/profiles/A1B2C3D4.jpg",
             "timestamp_creation": "2026-08-03 15:20:00",
             "timestamp_modified": "2026-08-03 15:20:00"
         },
@@ -76,7 +76,7 @@
             "role": "employee",
             "position": null,
             "department": null,
-            "image": "storage/profiles/employees/021/mark-acosta.jpg",
+            "image": "storage/profiles/93202626.jpg",
             "timestamp_creation": "2026-08-03 15:25:00",
             "timestamp_modified": "2026-08-03 15:25:00"
         }

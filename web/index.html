@@ -4,46 +4,234 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TAPIN | RFID Attendance Management</title>
-    <meta name="description" content="TAPIN RFID attendance management for faster, clearer, and more accountable timekeeping." />
-    <link rel="icon" type="image/png" href="icon/tapin_logo.png">
-    <link rel="stylesheet" href="css/index.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <meta name="description" content="TAPIN RFID attendance management for faster, clearer, and more accountable timekeeping.">
+    <link rel="icon" type="image/png" href="assets/tapin_icon.png">
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header class="site-header">
-        <nav class="navbar" aria-label="Primary navigation">
-            <a class="brand" href="./index.html"><span>TAPIN<small class="brand-sub">ISPSC TAGUDIN</small></span></a>
-            <div class="nav-links"><a href="#features">Capabilities</a><a href="#workflow">How it works</a><a class="nav-login" href="/login.html">Log in</a></div>
-        </nav>
-    </header>
-
-    <main>
-        <section class="hero">
-            <div class="hero-grid">
-                <div class="hero-copy">
-                    <div class="kicker">RFID attendance, made visible</div>
-                    <h1>Timekeeping with <span>clarity.</span></h1>
-                    <p>TAPIN turns every card tap into a dependable attendance record, giving campus teams a live view of people, devices, and the day ahead.</p>
-                    <div class="actions"><a class="btn btn-primary" href="/login.html">Open your dashboard <i class="fa-solid fa-arrow-right"></i></a><a class="btn btn-ghost" href="#features">Explore TAPIN <i class="fa-solid fa-angle-down"></i></a></div>
-                    <div class="hero-note"><i class="fa-solid fa-circle-check"></i> Built for ISPSC Tagudin Campus operations</div>
+<header class="site-header">
+    <nav class="navbar" aria-label="Primary navigation">
+        <a class="brand" href="index.html">
+            <span>TAPIN<small class="brand-sub">ISPSC TAGUDIN</small></span>
+        </a>
+        <div class="nav-links">
+            <a href="#features">Capabilities</a>
+            <a href="#workflow">How it works</a>
+            <a class="nav-login" href="login.html">Log in</a>
+        </div>
+    </nav>
+</header>
+<main>
+    <section class="hero">
+        <div class="hero-grid">
+            <div class="hero-copy">
+                <div class="kicker">RFID attendance, made visible</div>
+                <h1>Timekeeping with <span>clarity.</span></h1>
+                <p>
+                    TAPIN turns every card tap into a dependable attendance record,
+                    giving campus teams a live view of people, devices, and the day ahead.
+                </p>
+                <div class="actions">
+                    <a class="btn btn-primary" href="login.html">
+                        Open your dashboard
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                    <a class="btn btn-ghost" href="#features">
+                        Explore TAPIN
+                        <i class="fa-solid fa-angle-down"></i>
+                    </a>
                 </div>
-                <div class="dashboard-preview" aria-label="TAPIN dashboard preview">
-                    <div class="preview-window"><div class="window-bar"><i></i><i></i><i></i></div><div class="preview-body"><aside class="preview-side"><strong>TAPIN</strong><div class="side-line active">Overview</div><div class="side-line">Employees</div><div class="side-line">DTR Forms</div><div class="side-line">Live Feed</div><div class="side-line">Reports</div></aside><div class="preview-content"><div class="preview-title">Good morning, Admin <span class="preview-live"><i class="fa-solid fa-circle"></i> LIVE</span></div><div class="preview-stats"><div class="mini-stat teal"><small>Present today</small><b>186</b></div><div class="mini-stat gold"><small>Late arrivals</small><b>18</b></div><div class="mini-stat"><small>RFID scans</small><b>248</b></div></div><div class="preview-panel"><div class="panel-head"><span>Latest card activity</span><span>Today</span></div><div class="scan-row"><span class="scan-avatar">MS</span><span>Maria Santos<small>RFID-A001 · 07:58 AM</small></span><strong class="scan-status">Present</strong></div><div class="scan-row"><span class="scan-avatar">JD</span><span>Juan Dela Cruz<small>RFID-A002 · 08:15 AM</small></span><strong class="scan-status">Late</strong></div><div class="scan-row"><span class="scan-avatar">AG</span><span>Ana Garcia<small>RFID-A003 · 08:22 AM</small></span><strong class="scan-status">Present</strong></div></div></div></div></div>
+                <div class="hero-note">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Built for ISPSC Tagudin Campus operations
                 </div>
             </div>
-        </section>
-
-        <section class="strip" aria-label="TAPIN highlights"><div class="strip-item"><strong>1 tap</strong><span>to capture an attendance event</span></div><div class="strip-item"><strong>24 / 7</strong><span>visibility for authorized teams</span></div><div class="strip-item"><strong>100%</strong><span>clearer than manual time logs</span></div></section>
-
-        <section class="section" id="features"><div class="section-label">One system. Every signal.</div><h2 class="section-heading">The details that make attendance trustworthy.</h2><p class="section-intro">From the first tap at the gate to the final DTR review, TAPIN keeps operational data close, current, and easy to act on.</p><div class="feature-grid"><article class="feature"><div class="feature-icon"><i class="fa-solid fa-tower-broadcast"></i></div><h3>Live RFID feed</h3><p>See card activity as it happens, match scans to user records, and spot an offline reader before it becomes a blind spot.</p></article><article class="feature"><div class="feature-icon"><i class="fa-solid fa-chart-line"></i></div><h3>Clearer decisions</h3><p>Turn daily attendance signals into readable summaries for HR reviews, reports, and better follow-through.</p></article><article class="feature"><div class="feature-icon"><i class="fa-solid fa-shield-halved"></i></div><h3>Accountable by design</h3><p>Role-based access and server-side sessions keep administrative tools in the right hands.</p></article></div></section>
-
-        <section class="section workflow" id="workflow"><div class="section-label">A simpler daily rhythm</div><h2 class="section-heading">From card to confidence.</h2><p class="section-intro">TAPIN connects the physical entrance with the digital record in three quiet, reliable steps.</p><div class="steps"><article class="step"><span class="step-number">01</span><h3>Tap the card</h3><p>An RFID reader captures the card UID and sends the event securely to the TAPIN API.</p></article><article class="step"><span class="step-number">02</span><h3>Match the person</h3><p>The system finds the registered user, records the timestamp, and identifies the device.</p></article><article class="step"><span class="step-number">03</span><h3>See the day</h3><p>Authorized staff see current activity, device health, and attendance context in one dashboard.</p></article></div></section>
-
-        <section class="section cta"><div class="section-label">Ready when you are</div><h2 class="section-heading">Bring attendance into focus.</h2><p>Sign in to the TAPIN command center and see what your campus knows right now.</p><a class="btn btn-primary" href="/login.html">Sign in to TAPIN <i class="fa-solid fa-arrow-right"></i></a></section>
-    </main>
-    <footer class="site-footer"><span>TAPIN — RFID Attendance Management System</span><span>ISPSC Tagudin Campus · 2026</span></footer>
+            <div class="dashboard-preview" aria-label="TAPIN dashboard preview">
+                <div class="preview-window">
+                    <div class="window-bar">
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                    </div>
+                    <div class="preview-body">
+                        <aside class="preview-side">
+                            <strong>TAPIN</strong>
+                            <div class="side-line active">Overview</div>
+                            <div class="side-line">Employees</div>
+                            <div class="side-line">DTR Forms</div>
+                            <div class="side-line">Live Feed</div>
+                            <div class="side-line">Reports</div>
+                        </aside>
+                        <div class="preview-content">
+                            <div class="preview-title">
+                                Good morning, Admin
+                                <span class="preview-live">
+                                    <i class="fa-solid fa-circle"></i> LIVE
+                                </span>
+                            </div>
+                            <div class="preview-stats">
+                                <div class="mini-stat teal">
+                                    <small>Present today</small>
+                                    <b>186</b>
+                                </div>
+                                <div class="mini-stat gold">
+                                    <small>Late arrivals</small>
+                                    <b>18</b>
+                                </div>
+                                <div class="mini-stat">
+                                    <small>RFID scans</small>
+                                    <b>248</b>
+                                </div>
+                            </div>
+                            <div class="preview-panel">
+                                <div class="panel-head">
+                                    <span>Latest card activity</span>
+                                    <span>Today</span>
+                                </div>
+                                <div class="scan-row">
+                                    <span class="scan-avatar">MS</span>
+                                    <span>
+                                        Maria Santos
+                                        <small>RFID-A001 · 07:58 AM</small>
+                                    </span>
+                                    <strong class="scan-status">Present</strong>
+                                </div>
+                                <div class="scan-row">
+                                    <span class="scan-avatar">JD</span>
+                                    <span>
+                                        Juan Dela Cruz
+                                        <small>RFID-A002 · 08:15 AM</small>
+                                    </span>
+                                    <strong class="scan-status">Late</strong>
+                                </div>
+                                <div class="scan-row">
+                                    <span class="scan-avatar">AG</span>
+                                    <span>
+                                        Ana Garcia
+                                        <small>RFID-A003 · 08:22 AM</small>
+                                    </span>
+                                    <strong class="scan-status">Present</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section class="strip" aria-label="TAPIN highlights">
+        <div class="strip-item">
+            <strong>1 tap</strong>
+            <span>to capture an attendance event</span>
+        </div>
+        <div class="strip-item">
+            <strong>24 / 7</strong>
+            <span>visibility for authorized teams</span>
+        </div>
+        <div class="strip-item">
+            <strong>100%</strong>
+            <span>clearer than manual time logs</span>
+        </div>
+    </section>
+    <section class="section" id="features">
+        <div class="section-label">One system. Every signal.</div>
+        <h2 class="section-heading">
+            The details that make attendance trustworthy.
+        </h2>
+        <p class="section-intro">
+            From the first tap at the gate to the final DTR review,
+            TAPIN keeps operational data close, current, and easy to act on.
+        </p>
+        <div class="feature-grid">
+            <article class="feature">
+                <div class="feature-icon">
+                    <i class="fa-solid fa-tower-broadcast"></i>
+                </div>
+                <h3>Live RFID feed</h3>
+                <p>
+                    See card activity as it happens, match scans to user records,
+                    and spot an offline reader before it becomes a blind spot.
+                </p>
+            </article>
+            <article class="feature">
+                <div class="feature-icon">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <h3>Clearer decisions</h3>
+                <p>
+                    Turn daily attendance signals into readable summaries for HR reviews,
+                    reports, and better follow-through.
+                </p>
+            </article>
+            <article class="feature">
+                <div class="feature-icon">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h3>Accountable by design</h3>
+                <p>
+                    Role-based access and server-side sessions keep administrative tools
+                    in the right hands.
+                </p>
+            </article>
+        </div>
+    </section>
+    <section class="section workflow" id="workflow">
+        <div class="section-label">A simpler daily rhythm</div>
+        <h2 class="section-heading">
+            From card to confidence.
+        </h2>
+        <p class="section-intro">
+            TAPIN connects the physical entrance with the digital record
+            in three quiet, reliable steps.
+        </p>
+        <div class="steps">
+            <article class="step">
+                <span class="step-number">01</span>
+                <h3>Tap the card</h3>
+                <p>
+                    An RFID reader captures the card UID and sends the event
+                    securely to the TAPIN API.
+                </p>
+            </article>
+            <article class="step">
+                <span class="step-number">02</span>
+                <h3>Match the person</h3>
+                <p>
+                    The system finds the registered user, records the timestamp,
+                    and identifies the device.
+                </p>
+            </article>
+            <article class="step">
+                <span class="step-number">03</span>
+                <h3>See the day</h3>
+                <p>
+                    Authorized staff see current activity, device health,
+                    and attendance context in one dashboard.
+                </p>
+            </article>
+        </div>
+    </section>
+    <section class="section cta">
+        <div class="section-label">Ready when you are</div>
+        <h2 class="section-heading">
+            Bring attendance into focus.
+        </h2>
+        <p>
+            Sign in to the TAPIN command center and see what your campus knows right now.
+        </p>
+        <a class="btn btn-primary" href="login.html">
+            Sign in to TAPIN
+            <i class="fa-solid fa-arrow-right"></i>
+        </a>
+    </section>
+</main>
+<footer class="site-footer">
+    <span>TAPIN — RFID Attendance Management System</span>
+    <span>ISPSC Tagudin Campus · 2026</span>
+</footer>
 </body>
 </html>
