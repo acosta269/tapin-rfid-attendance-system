@@ -29,9 +29,18 @@ app.config.update(
     SESSION_COOKIE_NAME='tapin_session'
 )
 
-# Get the base directory (parent folder of the app folder)
-# app.py is in /app/ folder, so we go up one level to reach storage
+# FIXED: Get the base directory more reliably
+# Try multiple ways to find the storage folder
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# If app.py is in the root folder (not in app/ subfolder), adjust
+if not os.path.exists(os.path.join(BASE_DIR, "storage")):
+    # Try using the current working directory
+    BASE_DIR = os.getcwd()
+    
+# If still not found, try the directory where app.py is located
+if not os.path.exists(os.path.join(BASE_DIR, "storage")):
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Store user records in the storage/database folder (outside app folder)
 USER_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "users.json")
@@ -39,6 +48,13 @@ USER_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "users.json")
 ATTENDANCE_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "attendance.json")
 # Profile images storage
 PROFILE_STORAGE = os.path.join(BASE_DIR, "storage", "profiles")
+
+# Debug: Print paths to verify
+print(f"BASE_DIR: {BASE_DIR}")
+print(f"USER_DATA_FILE: {USER_DATA_FILE}")
+print(f"ATTENDANCE_DATA_FILE: {ATTENDANCE_DATA_FILE}")
+print(f"PROFILE_STORAGE: {PROFILE_STORAGE}")
+
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
 EMPLOYEE_DASHBOARD = "/pages/employee-dashboard.html"
@@ -93,6 +109,7 @@ def load_attendance_data():
         with open(ATTENDANCE_DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(default_data, f, indent=4)
             f.write("\n")
+        print(f"Created new attendance file: {ATTENDANCE_DATA_FILE}")
         return default_data
     
     try:
@@ -761,7 +778,7 @@ def update_employee(rfid):
             "message": "Update failed: " + str(e)
         }), 500
 
-# Authenticate all roles and create a three-hour session.
+# FIXED: Authenticate all roles and create a three-hour session.
 @app.route("/api/login", methods=["POST"])
 def login():
     try:
@@ -776,9 +793,23 @@ def login():
         password = str(data.get("password", "")).strip()
         password_hash = hashlib.md5(password.encode("utf-8")).hexdigest()
 
+        print(f"Login attempt - Username: '{username}'")
+        print(f"Password hash: '{password_hash}'")
+        print(f"Total users in database: {len(employee_database)}")
+
+        # Debug: Print all usernames
         for emp in employee_database.values():
-            if emp.get("username") == username:
-                if password_hash == emp.get("password_hash", "").lower():
+            print(f"  User in DB: '{emp.get('username')}' with role: {emp.get('role')}")
+
+        for emp in employee_database.values():
+            stored_username = emp.get("username")
+            if stored_username and stored_username == username:
+                print(f"Username match found for: {username}")
+                stored_hash = emp.get("password_hash", "").lower()
+                print(f"Stored hash: '{stored_hash}'")
+                print(f"Input hash:  '{password_hash}'")
+                
+                if password_hash == stored_hash:
                     # Admin and HR use the command center; employees use the main dashboard.
                     role = get_user_role(emp)
                     user_data = {
@@ -811,6 +842,7 @@ def login():
                         "token": token
                     }), 200
 
+        print(f"Login failed for: {username} - User not found or password mismatch")
         return jsonify({
             "status": "error",
             "message": "Invalid username or password"
@@ -1012,12 +1044,23 @@ def device_ping():
             "message": str(e)
         }), 500
 
-# Receive an RFID scan and match it to a user record.
+# FIXED: Receive an RFID scan and match it to a user record.
 @app.route("/api/receive-rfid", methods=["POST"])
 def receive_rfid():
     try:
+        # Log the raw request for debugging
+        print(f"RFID receive request received")
+        print(f"Content-Type: {request.headers.get('Content-Type')}")
+        print(f"Raw data: {request.get_data()}")
+        
         data = request.get_json()
-        if not data or "rfid" not in data or "scanned_at" not in data:
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "Invalid JSON or missing data"
+            }), 400
+            
+        if "rfid" not in data or "scanned_at" not in data:
             return jsonify({
                 "status": "error",
                 "message": "Missing required fields: rfid and scanned_at"
@@ -1025,6 +1068,8 @@ def receive_rfid():
 
         rfid = str(data["rfid"]).strip().upper()
         scanned_at = str(data["scanned_at"])
+
+        print(f"Processing RFID: {rfid} at {scanned_at}")
 
         latest_scan["rfid"] = rfid
         latest_scan["scanned_at"] = scanned_at
@@ -1037,38 +1082,36 @@ def receive_rfid():
 
         employee = employee_database.get(rfid)
         if employee:
+            print(f"RFID matched: {employee['firstname']} {employee['lastname']}")
             record_attendance_scan(employee, scanned_at)
         else:
-            # Ensure unknown RFID scans are still tracked for later lookup
-            print("RFID not found in database:", rfid)
+            print(f"RFID not found in database: {rfid}")
 
         save_attendance_data()
 
-        print("RFID Received:", rfid, "at", scanned_at)
-
+        response_data = {
+            "status": "success",
+            "message": "RFID received",
+            "rfid": rfid,
+            "scanned_at": scanned_at,
+            "found": bool(employee)
+        }
+        
         if employee:
-            print("RFID Matched:", employee["firstname"], employee["lastname"], "ID:", employee["employeeid"])
-            return jsonify({
-                "status": "success",
-                "message": "RFID received and matched",
-                "rfid": rfid,
-                "scanned_at": scanned_at,
-                "found": True
-            }), 200
-        else:
-            print("No match for RFID:", rfid)
-            return jsonify({
-                "status": "success",
-                "message": "RFID received - Not registered",
-                "rfid": rfid,
-                "scanned_at": scanned_at,
-                "found": False
-            }), 200
+            response_data["employee"] = {
+                "uid": employee.get("uid"),
+                "employeeid": employee.get("employeeid"),
+                "firstname": employee.get("firstname"),
+                "lastname": employee.get("lastname")
+            }
+
+        return jsonify(response_data), 200
 
     except Exception as e:
+        print(f"Error in receive_rfid: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": "Server error: " + str(e)
+            "message": f"Server error: {str(e)}"
         }), 500
 
 # Error Handlers
@@ -1089,6 +1132,8 @@ def page_not_found(e):
 @app.route("/api/verify-token", methods=["OPTIONS"])
 @app.route("/api/register-employee", methods=["OPTIONS"])
 @app.route("/api/update-employee/<rfid>", methods=["OPTIONS"])
+@app.route("/api/receive-rfid", methods=["OPTIONS"])
+@app.route("/api/device-ping", methods=["OPTIONS"])
 def handle_options():
     response = jsonify({"status": "ok"})
     origin = request.headers.get("Origin")
