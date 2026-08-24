@@ -885,13 +885,31 @@ def get_session():
     }), 200
 
 # Clear the authenticated user's session.
-@app.route("/api/logout", methods=["POST"])
+# Clear the authenticated user's session.
+@app.route("/api/logout", methods=["POST", "GET", "OPTIONS"])
 def logout():
-    session.clear()
-    return jsonify({
-        "status": "success",
-        "message": "Logged out successfully"
-    }), 200
+    try:
+        # Clear session
+        session.clear()
+        
+        # Also clear any session cookies
+        response = jsonify({
+            "status": "success",
+            "message": "Logged out successfully"
+        })
+        
+        # Remove the session cookie
+        response.set_cookie('tapin_session', '', expires=0)
+        response.set_cookie('session', '', expires=0)
+        
+        print("User logged out successfully")
+        return response, 200
+    except Exception as e:
+        print(f"Logout error: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Logout failed: {str(e)}"
+        }), 500
 
 # Semi Web Routes
 # Return the latest RFID scan and online devices for the web dashboard.

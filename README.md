@@ -357,10 +357,6 @@ This project is licensed under the **GNU Affero General Public License v3.0 (AGP
 
 See the `LICENSE` file for the complete license terms.
 
-## Repository
-
-[GitHub Repository](https://github.com/lolenseu/tapin-rfid-attendance-system)
-
 ## Author
 
 **lolenseu**
