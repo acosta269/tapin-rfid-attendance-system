@@ -14,6 +14,7 @@ const profileIconPlaceholder = $('#profileIconPlaceholder');
 
 let currentData = null;
 let isFirstLoad = true;
+let currentRfid = null;
 
 function loadLogo() {
     const logoPaths = [
@@ -94,42 +95,53 @@ function render(data) {
     const isFound = data.found === true;
     const hasEmployee = data.employee !== null && data.employee !== undefined;
 
+    // Update scanned time (always update)
     if (data.scanned_at) {
         scannedAt.textContent = formatDate(data.scanned_at);
     } else {
         scannedAt.textContent = 'Waiting for scan...';
     }
 
+    // Update last updated time
     lastUpdated.textContent = 'Updated: ' + new Date().toLocaleTimeString('en-PH', { hour12: true });
 
-    if (isFound && hasEmployee) {
-        renderEmployee(data.employee, true);
-        employeeCard.classList.add('visible');
-        noData.style.display = 'none';
-    } else if (data.rfid && !isFound) {
-        renderUnknownEmployee(data.rfid, data.scanned_at);
-        employeeCard.classList.add('visible');
-        noData.style.display = 'none';
-    } else {
-        employeeCard.classList.remove('visible');
-        noData.style.display = 'flex';
-    }
+    // Check if RFID changed or if we need to switch states
+    const rfidChanged = (data.rfid !== currentRfid);
+    const stateChanged = (isFound && hasEmployee) !== employeeCard.classList.contains('visible');
 
-    if (isFound && hasEmployee) {
-        statusDot.className = 'status-dot online';
-        statusText.textContent = 'Employee registered';
-    } else if (data.rfid && !isFound) {
-        statusDot.className = 'status-dot unknown';
-        statusText.textContent = 'Employee not registered';
-    } else {
-        statusDot.className = 'status-dot offline';
-        statusText.textContent = 'Waiting for scan';
-    }
+    if (rfidChanged || stateChanged || isFirstLoad) {
+        currentRfid = data.rfid;
 
-    isFirstLoad = false;
+        if (isFound && hasEmployee) {
+            renderEmployee(data.employee);
+            employeeCard.classList.add('visible');
+            noData.style.display = 'none';
+        } else if (data.rfid && !isFound) {
+            renderUnknownEmployee(data.rfid, data.scanned_at);
+            employeeCard.classList.add('visible');
+            noData.style.display = 'none';
+        } else {
+            employeeCard.classList.remove('visible');
+            noData.style.display = 'flex';
+        }
+
+        // Update status
+        if (isFound && hasEmployee) {
+            statusDot.className = 'status-dot online';
+            statusText.textContent = 'Employee registered';
+        } else if (data.rfid && !isFound) {
+            statusDot.className = 'status-dot unknown';
+            statusText.textContent = 'Employee not registered';
+        } else {
+            statusDot.className = 'status-dot offline';
+            statusText.textContent = 'Waiting for scan';
+        }
+
+        isFirstLoad = false;
+    }
 }
 
-function renderEmployee(emp, isRegistered) {
+function renderEmployee(emp) {
     const fullname = (emp.firstname || '') + ' ' + (emp.lastname || '');
     const initials = getInitials(emp.firstname, emp.lastname);
     const role = emp.role || 'employee';
@@ -137,7 +149,9 @@ function renderEmployee(emp, isRegistered) {
     const scannedTime = currentData.scanned_at ? formatTime(currentData.scanned_at) : '--';
     const currentTime = getCurrentTime();
 
-    let html = `
+    // Only rebuild HTML if employee data changed
+    const currentHtml = employeeCard.innerHTML;
+    const newHtml = `
         <div class="profile-section">
             <div class="profile-avatar">
                 ${emp.image ? `<img src="${emp.image}" alt="${fullname}" onerror="this.style.display='none';this.parentElement.textContent='${initials}';">` : `<span class="initials-text">${initials}</span>`}
@@ -160,7 +174,7 @@ function renderEmployee(emp, isRegistered) {
         <div class="time-section">
             <div class="time-item">
                 <div class="label">Time In</div>
-                <div class="value clock-in">${scannedTime}</div>
+                <div class="value clock-in" id="timeInValue">${scannedTime}</div>
             </div>
             <div class="time-item">
                 <div class="label">Current Time</div>
@@ -169,15 +183,26 @@ function renderEmployee(emp, isRegistered) {
         </div>
     `;
 
-    employeeCard.innerHTML = html;
+    // Only update if HTML changed
+    if (currentHtml !== newHtml) {
+        employeeCard.innerHTML = newHtml;
+    } else {
+        // Just update the time values without re-rendering
+        const timeInElem = document.getElementById('timeInValue');
+        const currentTimeElem = document.getElementById('currentTimeDisplay');
+        if (timeInElem) timeInElem.textContent = scannedTime;
+        if (currentTimeElem) currentTimeElem.textContent = currentTime;
+    }
 
+    // Keep current time updating
     const currentTimeDisplay = document.getElementById('currentTimeDisplay');
     if (currentTimeDisplay) {
         if (window._timeInterval) {
             clearInterval(window._timeInterval);
         }
         window._timeInterval = setInterval(() => {
-            currentTimeDisplay.textContent = getCurrentTime();
+            const elem = document.getElementById('currentTimeDisplay');
+            if (elem) elem.textContent = getCurrentTime();
         }, 1000);
     }
 }
@@ -186,7 +211,8 @@ function renderUnknownEmployee(rfid, scannedAtTime) {
     const scannedTime = scannedAtTime ? formatTime(scannedAtTime) : '--';
     const currentTime = getCurrentTime();
 
-    let html = `
+    const currentHtml = employeeCard.innerHTML;
+    const newHtml = `
         <div class="profile-section">
             <div class="profile-avatar unknown-avatar">
                 <span class="initials-text">❓</span>
@@ -209,7 +235,7 @@ function renderUnknownEmployee(rfid, scannedAtTime) {
         <div class="time-section">
             <div class="time-item">
                 <div class="label">Time In</div>
-                <div class="value clock-in">${scannedTime}</div>
+                <div class="value clock-in" id="timeInValueUnknown">${scannedTime}</div>
             </div>
             <div class="time-item">
                 <div class="label">Current Time</div>
@@ -218,7 +244,14 @@ function renderUnknownEmployee(rfid, scannedAtTime) {
         </div>
     `;
 
-    employeeCard.innerHTML = html;
+    if (currentHtml !== newHtml) {
+        employeeCard.innerHTML = newHtml;
+    } else {
+        const timeInElem = document.getElementById('timeInValueUnknown');
+        const currentTimeElem = document.getElementById('currentTimeDisplayUnknown');
+        if (timeInElem) timeInElem.textContent = scannedTime;
+        if (currentTimeElem) currentTimeElem.textContent = currentTime;
+    }
 
     const currentTimeDisplay = document.getElementById('currentTimeDisplayUnknown');
     if (currentTimeDisplay) {
@@ -226,7 +259,8 @@ function renderUnknownEmployee(rfid, scannedAtTime) {
             clearInterval(window._timeInterval);
         }
         window._timeInterval = setInterval(() => {
-            currentTimeDisplay.textContent = getCurrentTime();
+            const elem = document.getElementById('currentTimeDisplayUnknown');
+            if (elem) elem.textContent = getCurrentTime();
         }, 1000);
     }
 }

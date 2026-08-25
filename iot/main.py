@@ -64,7 +64,8 @@ def check_api_connectivity():
         # Wrap the connected socket with SSL
         s = ssl.wrap_socket(s)
         
-        data = '{"device_id":"' + param.DEVICE_ID + '","status":"test"}'
+        # Use ujson to create JSON data
+        data = json.dumps({"device_id": param.DEVICE_ID, "status": "test"})
         request = (
             "POST /api/device-ping HTTP/1.1\r\n"
             "Host: " + API_ADDR + "\r\n"
@@ -99,7 +100,8 @@ def test_api_connection():
         # Wrap the connected socket with SSL
         s = ssl.wrap_socket(s)
         
-        data = '{"device_id":"' + param.DEVICE_ID + '","status":"test"}'
+        # Use ujson to create JSON data
+        data = json.dumps({"device_id": param.DEVICE_ID, "status": "test"})
         request = (
             "POST /api/device-ping HTTP/1.1\r\n"
             "Host: " + API_ADDR + "\r\n"
@@ -173,7 +175,8 @@ def send_ping():
         # Wrap the connected socket with SSL
         s = ssl.wrap_socket(s)
         
-        data = '{"device_id":"' + param.DEVICE_ID + '","status":"alive"}'
+        # Use ujson to create JSON data
+        data = json.dumps({"device_id": param.DEVICE_ID, "status": "alive"})
         request = (
             "POST /api/device-ping HTTP/1.1\r\n"
             "Host: " + API_ADDR + "\r\n"
@@ -209,7 +212,11 @@ def post_data(rfid_str):
         t[0], t[1], t[2], t[3], t[4], t[5]
     )
     
-    data = '{"rfid":"' + rfid_str + '","scanned_at":"' + scanned_time + '"}'
+    # Use ujson to create JSON data
+    data = json.dumps({
+        "rfid": rfid_str,
+        "scanned_at": scanned_time
+    })
     
     try:
         # Display the URL being sent to (similar to ping)
