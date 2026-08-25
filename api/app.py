@@ -43,9 +43,6 @@ if not os.path.exists(os.path.join(BASE_DIR, "storage")):
 if not os.path.exists(os.path.join(BASE_DIR, "storage")):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Ensure directories exist first before defining file paths
-os.makedirs(os.path.dirname(SCAN_FEED_FILE), exist_ok=True)
-
 # Store user records in the storage/database folder (outside app folder)
 USER_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "users.json")
 
@@ -57,6 +54,12 @@ PROFILE_STORAGE = os.path.join(BASE_DIR, "storage", "profiles")
 
 # Scan feed storage - keeps detailed logs of all scans
 SCAN_FEED_FILE = os.path.join(BASE_DIR, "storage", "feed", "scan_feed.json")
+
+# Ensure directories exist
+os.makedirs(os.path.dirname(USER_DATA_FILE), exist_ok=True)
+os.makedirs(os.path.dirname(ATTENDANCE_DATA_FILE), exist_ok=True)
+os.makedirs(os.path.dirname(PROFILE_STORAGE), exist_ok=True)
+os.makedirs(os.path.dirname(SCAN_FEED_FILE), exist_ok=True)
 
 # Debug: Print paths to verify
 print(f"BASE_DIR: {BASE_DIR}")
@@ -1266,13 +1269,13 @@ def page_not_found(e):
 
 ## OPTIONS Handlers ------------------------------------
 @app.route("/api/login", methods=["OPTIONS"])
-@app.route("/api/session", methods["OPTIONS"])
+@app.route("/api/session", methods=["OPTIONS"])
 @app.route("/api/logout", methods=["OPTIONS"])
 @app.route("/api/dashboard-data", methods=["OPTIONS"])
 @app.route("/api/verify-token", methods=["OPTIONS"])
 @app.route("/api/register-employee", methods=["OPTIONS"])
 @app.route("/api/update-employee/<rfid>", methods=["OPTIONS"])
-@app.route("/api/receive-rfid", methods["OPTIONS"])
+@app.route("/api/receive-rfid", methods=["OPTIONS"])
 @app.route("/api/device-ping", methods=["OPTIONS"])
 @app.route("/api/scan-feed", methods=["OPTIONS"])
 def handle_options():
