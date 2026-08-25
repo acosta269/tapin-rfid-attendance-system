@@ -849,9 +849,10 @@ def register_employee():
             rfid_filename = secure_filename(rfid)
             os.makedirs(PROFILE_STORAGE, exist_ok=True)
             
-            # Save image directly in profiles folder with RFID as filename
-            image_file.save(os.path.join(PROFILE_STORAGE, rfid_filename + extension))
-            image_path = os.path.join("storage", "profiles", rfid_filename + extension).replace(os.sep, "/")
+            # Save image with full filename including extension
+            filename = rfid_filename + extension
+            image_file.save(os.path.join(PROFILE_STORAGE, filename))
+            image_path = os.path.join("storage", "profiles", filename).replace(os.sep, "/")
 
         employee = {
             "uid": uid,
@@ -990,8 +991,9 @@ def update_employee(rfid):
             # Save new image with RFID as filename
             rfid_filename = secure_filename(rfid)
             os.makedirs(PROFILE_STORAGE, exist_ok=True)
-            image_file.save(os.path.join(PROFILE_STORAGE, rfid_filename + extension))
-            updated_employee["image"] = os.path.join("storage", "profiles", rfid_filename + extension).replace(os.sep, "/")
+            filename = rfid_filename + extension
+            image_file.save(os.path.join(PROFILE_STORAGE, filename))
+            updated_employee["image"] = os.path.join("storage", "profiles", filename).replace(os.sep, "/")
         
         # Update timestamp
         updated_employee["timestamp_modified"] = now
@@ -1119,21 +1121,49 @@ def get_latest_rfid():
     scanned_at = latest_scan.get("scanned_at")
     employee = employee_database.get(rfid) if rfid else None
 
-    return jsonify({
-        "status": "success",
-        "rfid": rfid,
-        "scanned_at": scanned_at,
-        "devices": get_online_devices(),
-        "found": bool(employee),
-        "employee": {
+    # Build employee data with full image URL
+    employee_data = None
+    if employee:
+        # Get the stored image path from the employee record
+        stored_image = employee.get("image", "")
+        image_url = ""
+        
+        if stored_image:
+            # If image path already exists, use it directly (it already has the correct extension)
+            if stored_image.startswith("http"):
+                image_url = stored_image
+            else:
+                # Use the stored image path directly - it already has the correct extension
+                image_url = f"{request.host_url}{stored_image}"
+        else:
+            # Fallback: try to find the image file in storage/profiles/
+            rfid_filename = employee.get("rfid", "")
+            if rfid_filename:
+                # Check for common image extensions
+                image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+                for ext in image_extensions:
+                    image_path = os.path.join(PROFILE_STORAGE, rfid_filename + ext)
+                    if os.path.exists(image_path):
+                        image_url = f"{request.host_url}storage/profiles/{rfid_filename}{ext}"
+                        break
+
+        employee_data = {
             "uid": employee.get("uid"),
             "rfid": employee.get("rfid"),
             "employeeid": employee.get("employeeid"),
             "lastname": employee.get("lastname"),
             "firstname": employee.get("firstname"),
             "role": employee.get("role"),
-            "image": employee.get("image")
-        } if employee else None
+            "image": image_url
+        }
+
+    return jsonify({
+        "status": "success",
+        "rfid": rfid,
+        "scanned_at": scanned_at,
+        "devices": get_online_devices(),
+        "found": bool(employee),
+        "employee": employee_data
     }), 200
 
 # Reload users.json into the in-memory RFID lookup database.

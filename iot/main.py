@@ -86,54 +86,6 @@ def check_api_connectivity():
     except:
         return False
 
-def test_api_connection():
-    """Test API connection before starting main loop using raw socket with SSL"""
-    if not check_wifi_connection():
-        return False
-        
-    try:
-        tprint(PRINTSTATUS.INFO, "Testing API connection...")
-        addr = usocket.getaddrinfo(API_ADDR, 443)[0][-1]
-        s = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
-        s.settimeout(10)
-        s.connect(addr)
-        # Wrap the connected socket with SSL
-        s = ssl.wrap_socket(s)
-        
-        # Use ujson to create JSON data
-        data = json.dumps({"device_id": param.DEVICE_ID, "status": "test"})
-        request = (
-            "POST /api/device-ping HTTP/1.1\r\n"
-            "Host: " + API_ADDR + "\r\n"
-            "Content-Type: application/json\r\n"
-            "Content-Length: " + str(len(data)) + "\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            + data
-        )
-        
-        tprint(PRINTSTATUS.INFO, f"Testing API: https://{API_ADDR}/api/device-ping")
-        s.write(request.encode())
-        response = s.read(200)
-        s.close()
-        
-        if b"200" in response:
-            tprint(PRINTSTATUS.SUCCESS, "API connection OK")
-            return True
-        else:
-            # Try to extract status code
-            try:
-                response_str = response.decode()
-                if "HTTP/1.1" in response_str:
-                    status_line = response_str.split("\r\n")[0]
-                    tprint(PRINTSTATUS.INFO, f"Response: {status_line}")
-            except:
-                tprint(PRINTSTATUS.INFO, f"Response: {response[:50]}")
-            return False
-    except Exception as e:
-        tprint(PRINTSTATUS.ERROR, f"API connection test failed: {str(e)}")
-        return False
-
 def restart_device():
     """Restart the device"""
     tprint(PRINTSTATUS.WARN, "RESTARTING: No internet connection...")
@@ -453,12 +405,6 @@ def main():
 
     # Sync Manila Time
     sync_manila_time()
-
-    # Test API connection - restart if fails
-    if not test_api_connection():
-        tprint(PRINTSTATUS.ERROR, "API connection failed! Restarting...")
-        time.sleep_ms(2000)
-        machine.reset()
 
     # NORMAL OPERATION
     last_rfid = None                                # Track last scanned RFID to prevent duplicates

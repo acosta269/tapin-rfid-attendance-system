@@ -1,4 +1,5 @@
-const API_URL = 'https://tapin-api.up.railway.app/api/get-latest-rfid';
+const API_BASE_URL = 'https://tapin-api.up.railway.app';
+const API_URL = `${API_BASE_URL}/api/get-latest-rfid`;
 const POLL_INTERVAL = 2000;
 
 const $ = (sel) => document.querySelector(sel);
@@ -90,6 +91,13 @@ function getCurrentTime() {
     return now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 }
 
+function getImageUrl(imagePath) {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    // If image path is relative, prepend the API base URL
+    return `${API_BASE_URL}/${imagePath}`;
+}
+
 function render(data) {
     currentData = data;
     const isFound = data.found === true;
@@ -148,13 +156,14 @@ function renderEmployee(emp) {
     const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
     const scannedTime = currentData.scanned_at ? formatTime(currentData.scanned_at) : '--';
     const currentTime = getCurrentTime();
+    const imageUrl = getImageUrl(emp.image);
 
     // Only rebuild HTML if employee data changed
     const currentHtml = employeeCard.innerHTML;
     const newHtml = `
         <div class="profile-section">
             <div class="profile-avatar">
-                ${emp.image ? `<img src="${emp.image}" alt="${fullname}" onerror="this.style.display='none';this.parentElement.textContent='${initials}';">` : `<span class="initials-text">${initials}</span>`}
+                ${imageUrl ? `<img src="${imageUrl}" alt="${fullname}" onerror="this.style.display='none';this.parentElement.textContent='${initials}';">` : `<span class="initials-text">${initials}</span>`}
             </div>
             <div class="profile-info">
                 <div class="fullname">${fullname || 'Unknown'}</div>
