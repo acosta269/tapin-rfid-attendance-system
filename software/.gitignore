@@ -1,0 +1,19 @@
+# Keep folder structure
+!storage/
+!storage/assets/
+!storage/database/
+!storage/samples/
+!storage/profiles/
+
+# Keep .gitkeep files
+!storage/.gitkeep
+!storage/assets/.gitkeep
+!storage/database/.gitkeep
+!storage/samples/.gitkeep
+!storage/profiles/.gitkeep
+
+# Ignore everything else in storage
+storage/*
+storage/**/*
+!storage/.gitkeep
+!storage/**/.gitkeep

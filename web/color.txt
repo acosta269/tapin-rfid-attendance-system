@@ -1,0 +1,1 @@
+Primary Blue / Purple-Blue: #4D6BFE (RGB: 77, 107, 254)Secondary/Variant Blue: #6377DCWhite (for background or accents): #FEFFFFDark / Neutral (for text and dark themes): #090d33 (Black Pearl) or #212327
