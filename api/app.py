@@ -5,11 +5,12 @@ import hashlib
 import calendar
 import jwt
 import secrets
+
 from flask import Flask, jsonify, request, session, send_from_directory, send_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 
-## Variables
+## Variables ------------------------------------
 # Create the Flask application.
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "tapin-development-secret-key")
@@ -42,30 +43,42 @@ if not os.path.exists(os.path.join(BASE_DIR, "storage")):
 if not os.path.exists(os.path.join(BASE_DIR, "storage")):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Ensure directories exist first before defining file paths
+os.makedirs(os.path.dirname(SCAN_FEED_FILE), exist_ok=True)
+
 # Store user records in the storage/database folder (outside app folder)
 USER_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "users.json")
+
 # Store every received RFID scan and timestamp.
 ATTENDANCE_DATA_FILE = os.path.join(BASE_DIR, "storage", "database", "attendance.json")
+
 # Profile images storage
 PROFILE_STORAGE = os.path.join(BASE_DIR, "storage", "profiles")
+
+# Scan feed storage - keeps detailed logs of all scans
+SCAN_FEED_FILE = os.path.join(BASE_DIR, "storage", "feed", "scan_feed.json")
 
 # Debug: Print paths to verify
 print(f"BASE_DIR: {BASE_DIR}")
 print(f"USER_DATA_FILE: {USER_DATA_FILE}")
 print(f"ATTENDANCE_DATA_FILE: {ATTENDANCE_DATA_FILE}")
 print(f"PROFILE_STORAGE: {PROFILE_STORAGE}")
+print(f"SCAN_FEED_FILE: {SCAN_FEED_FILE}")
 
 # Open the shared dashboard after a successful login.
 WEB_DASHBOARD = "/pages/dashboard.html"
 EMPLOYEE_DASHBOARD = "/pages/employee-dashboard.html"
+
 # Choose the frontend destination from the role stored in users.json.
 ROLE_DASHBOARDS = {
     "admin": WEB_DASHBOARD,
     "hr": WEB_DASHBOARD,
     "employee": EMPLOYEE_DASHBOARD,
 }
+
 # Assign separate UID ranges to each user role.
 ROLE_UID_RANGES = {"admin": (1, 9), "hr": (10, 19), "employee": (20, float("inf"))}
+
 # Remove devices that have not sent a heartbeat within this period.
 DEVICE_TIMEOUT_SECONDS = 90
 
@@ -98,6 +111,7 @@ latest_scan = {
     "scanned_at": None
 }
 
+## Functions ------------------------------------
 # Load persisted DTR records and scan events.
 def load_attendance_data():
     # Ensure the directory exists
@@ -158,6 +172,100 @@ def load_attendance_data():
         # Return empty structure
         return {"records": [], "scan_events": []}
 
+# Load scan feed data
+def load_scan_feed():
+    """Load scan feed data from JSON file"""
+    if not os.path.exists(SCAN_FEED_FILE):
+        # Create empty file with proper structure
+        default_data = {
+            "scans": [],
+            "total_scans": 0,
+            "last_cleanup": datetime.now().isoformat()
+        }
+        with open(SCAN_FEED_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, indent=4)
+            f.write("\n")
+        print(f"Created new scan feed file: {SCAN_FEED_FILE}")
+        return default_data
+    
+    try:
+        with open(SCAN_FEED_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            # Ensure we have the proper structure
+            if "scans" not in data:
+                data["scans"] = []
+            if "total_scans" not in data:
+                data["total_scans"] = len(data["scans"])
+            if "last_cleanup" not in data:
+                data["last_cleanup"] = datetime.now().isoformat()
+            return data
+    except (OSError, ValueError, json.JSONDecodeError) as e:
+        print(f"Error reading scan feed file: {e}")
+        return {"scans": [], "total_scans": 0, "last_cleanup": datetime.now().isoformat()}
+
+# Save scan feed data
+def save_scan_feed(scan_data):
+    """Save scan feed data to JSON file"""
+    os.makedirs(os.path.dirname(SCAN_FEED_FILE), exist_ok=True)
+    with open(SCAN_FEED_FILE, "w", encoding="utf-8") as f:
+        json.dump(scan_data, f, indent=4)
+        f.write("\n")
+
+# Add scan to feed
+def add_scan_to_feed(rfid, scanned_at, employee=None, found=False):
+    """Add a single scan to the feed with proper formatting"""
+    scan_feed_data = load_scan_feed()
+    
+    # Get current date for grouping
+    scan_date = datetime.now().date().isoformat()
+    
+    # Check if we need to clean up old scans (weekly cleanup)
+    last_cleanup = datetime.fromisoformat(scan_feed_data.get("last_cleanup", datetime.now().isoformat()))
+    days_since_cleanup = (datetime.now() - last_cleanup).days
+    
+    # Reset scan feed every Monday (weekly cleanup)
+    if days_since_cleanup >= 7:
+        scan_feed_data["scans"] = []
+        scan_feed_data["last_cleanup"] = datetime.now().isoformat()
+        scan_feed_data["total_scans"] = 0
+        print("Weekly scan feed cleanup performed")
+    
+    # Create scan entry without image
+    scan_entry = {
+        "rfid": rfid,
+        "scanned_at": scanned_at,
+        "scanned_on": scan_date,
+        "found": found,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # Add employee details if found (without image)
+    if employee:
+        scan_entry["employee"] = {
+            "uid": employee.get("uid"),
+            "employeeid": employee.get("employeeid"),
+            "firstname": employee.get("firstname"),
+            "lastname": employee.get("lastname"),
+            "role": employee.get("role")
+        }
+    else:
+        scan_entry["employee"] = None
+    
+    # Add to scans list (newest first)
+    scan_feed_data["scans"].insert(0, scan_entry)
+    
+    # Keep only last 1000 scans to prevent file from growing too large
+    if len(scan_feed_data["scans"]) > 1000:
+        scan_feed_data["scans"] = scan_feed_data["scans"][:1000]
+    
+    # Update total scans
+    scan_feed_data["total_scans"] = len(scan_feed_data["scans"])
+    
+    # Save to file
+    save_scan_feed(scan_feed_data)
+    
+    return scan_entry
+
 # Load attendance data
 attendance_data = load_attendance_data()
 attendance_records = attendance_data["records"]
@@ -168,7 +276,6 @@ if scan_events:
         "scanned_at": scan_events[-1].get("scanned_at")
     })
 
-## Functions
 # Save DTR records and scan history to the attendance database.
 def save_attendance_data():
     # Ensure the directory exists
@@ -496,7 +603,7 @@ def verify_token():
     except jwt.InvalidTokenError:
         return None, jsonify({"status": "error", "message": "Invalid token"}), 401
 
-## Routes
+## Web Routes ------------------------------------
 # Add CORS and no-cache headers to API responses.
 @app.after_request
 def add_cors_headers(response):
@@ -510,7 +617,6 @@ def add_cors_headers(response):
         response.headers["Cache-Control"] = "no-store"
     return response
 
-# Serve HTML pages
 @app.route('/')
 def serve_index():
     return send_file('login.html')
@@ -536,6 +642,140 @@ def serve_js(filename):
 def serve_profile_image(filename):
     return send_from_directory(PROFILE_STORAGE, filename)
 
+## Authentication Routes ------------------------------------
+# FIXED: Authenticate all roles and create a three-hour session.
+@app.route("/api/login", methods=["POST"])
+def login():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "Username and password are required"
+            }), 400
+
+        username = str(data.get("username", "")).strip()
+        password = str(data.get("password", "")).strip()
+        password_hash = hashlib.md5(password.encode("utf-8")).hexdigest()
+
+        print(f"Login attempt - Username: '{username}'")
+        print(f"Password hash: '{password_hash}'")
+        print(f"Total users in database: {len(employee_database)}")
+
+        # Debug: Print all usernames
+        for emp in employee_database.values():
+            print(f"  User in DB: '{emp.get('username')}' with role: {emp.get('role')}")
+
+        for emp in employee_database.values():
+            stored_username = emp.get("username")
+            if stored_username and stored_username == username:
+                print(f"Username match found for: {username}")
+                stored_hash = emp.get("password_hash", "").lower()
+                print(f"Stored hash: '{stored_hash}'")
+                print(f"Input hash:  '{password_hash}'")
+                
+                if password_hash == stored_hash:
+                    # Admin and HR use the command center; employees use the main dashboard.
+                    role = get_user_role(emp)
+                    user_data = {
+                        "uid": emp.get("uid"),
+                        "employeeid": emp.get("employeeid"),
+                        "username": emp.get("username"),
+                        "fullname": emp.get("firstname", "") + " " + emp.get("lastname", ""),
+                        "role": role,
+                        "rfid": emp.get("rfid")
+                    }
+                    
+                    # Create JWT token
+                    token = jwt.encode({
+                        'user': user_data,
+                        'exp': datetime.utcnow() + JWT_EXPIRATION
+                    }, JWT_SECRET, algorithm='HS256')
+                    
+                    # Also set session for backward compatibility
+                    session.permanent = True
+                    session["user"] = user_data
+                    session.modified = True
+                    
+                    print("Login successful for:", username)
+                    
+                    return jsonify({
+                        "status": "success",
+                        "message": "Login successful",
+                        "redirect": get_role_redirect(role),
+                        "user": user_data,
+                        "token": token
+                    }), 200
+
+        print(f"Login failed for: {username} - User not found or password mismatch")
+        return jsonify({
+            "status": "error",
+            "message": "Invalid username or password"
+        }), 401
+    except Exception as e:
+        print("Login error:", str(e))
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+# Verify JWT token
+@app.route("/api/verify-token", methods=["POST"])
+def verify_token_route():
+    user_data, error_response, status_code = verify_token()
+    if error_response:
+        return error_response, status_code
+    return jsonify({"status": "success", "user": user_data}), 200
+
+# Return the currently authenticated user's session.
+@app.route("/api/session", methods=["GET"])
+def get_session():
+    # First try to get user from token
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        user_data, error_response, status_code = verify_token()
+        if not error_response:
+            return jsonify({"status": "success", "user": user_data}), 200
+    
+    # Fallback to session
+    user = session.get("user")
+    if not user:
+        return jsonify({
+            "status": "error",
+            "message": "Session expired or user is not logged in"
+        }), 401
+    return jsonify({
+        "status": "success",
+        "user": user
+    }), 200
+
+# Clear the authenticated user's session.
+@app.route("/api/logout", methods=["POST", "GET", "OPTIONS"])
+def logout():
+    try:
+        # Clear session
+        session.clear()
+        
+        # Also clear any session cookies
+        response = jsonify({
+            "status": "success",
+            "message": "Logged out successfully"
+        })
+        
+        # Remove the session cookie
+        response.set_cookie('tapin_session', '', expires=0)
+        response.set_cookie('session', '', expires=0)
+        
+        print("User logged out successfully")
+        return response, 200
+    except Exception as e:
+        print(f"Logout error: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Logout failed: {str(e)}"
+        }), 500
+
+## Employee Management Routes ------------------------------------
 # Register a new admin, HR, or employee account.
 @app.route("/api/register-employee", methods=["POST"])
 def register_employee():
@@ -778,181 +1018,7 @@ def update_employee(rfid):
             "message": "Update failed: " + str(e)
         }), 500
 
-# FIXED: Authenticate all roles and create a three-hour session.
-@app.route("/api/login", methods=["POST"])
-def login():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                "status": "error",
-                "message": "Username and password are required"
-            }), 400
-
-        username = str(data.get("username", "")).strip()
-        password = str(data.get("password", "")).strip()
-        password_hash = hashlib.md5(password.encode("utf-8")).hexdigest()
-
-        print(f"Login attempt - Username: '{username}'")
-        print(f"Password hash: '{password_hash}'")
-        print(f"Total users in database: {len(employee_database)}")
-
-        # Debug: Print all usernames
-        for emp in employee_database.values():
-            print(f"  User in DB: '{emp.get('username')}' with role: {emp.get('role')}")
-
-        for emp in employee_database.values():
-            stored_username = emp.get("username")
-            if stored_username and stored_username == username:
-                print(f"Username match found for: {username}")
-                stored_hash = emp.get("password_hash", "").lower()
-                print(f"Stored hash: '{stored_hash}'")
-                print(f"Input hash:  '{password_hash}'")
-                
-                if password_hash == stored_hash:
-                    # Admin and HR use the command center; employees use the main dashboard.
-                    role = get_user_role(emp)
-                    user_data = {
-                        "uid": emp.get("uid"),
-                        "employeeid": emp.get("employeeid"),
-                        "username": emp.get("username"),
-                        "fullname": emp.get("firstname", "") + " " + emp.get("lastname", ""),
-                        "role": role,
-                        "rfid": emp.get("rfid")
-                    }
-                    
-                    # Create JWT token
-                    token = jwt.encode({
-                        'user': user_data,
-                        'exp': datetime.utcnow() + JWT_EXPIRATION
-                    }, JWT_SECRET, algorithm='HS256')
-                    
-                    # Also set session for backward compatibility
-                    session.permanent = True
-                    session["user"] = user_data
-                    session.modified = True
-                    
-                    print("Login successful for:", username)
-                    
-                    return jsonify({
-                        "status": "success",
-                        "message": "Login successful",
-                        "redirect": get_role_redirect(role),
-                        "user": user_data,
-                        "token": token
-                    }), 200
-
-        print(f"Login failed for: {username} - User not found or password mismatch")
-        return jsonify({
-            "status": "error",
-            "message": "Invalid username or password"
-        }), 401
-    except Exception as e:
-        print("Login error:", str(e))
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-
-# Verify JWT token
-@app.route("/api/verify-token", methods=["POST"])
-def verify_token_route():
-    user_data, error_response, status_code = verify_token()
-    if error_response:
-        return error_response, status_code
-    return jsonify({"status": "success", "user": user_data}), 200
-
-# Return the currently authenticated user's session.
-@app.route("/api/session", methods=["GET"])
-def get_session():
-    # First try to get user from token
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        user_data, error_response, status_code = verify_token()
-        if not error_response:
-            return jsonify({"status": "success", "user": user_data}), 200
-    
-    # Fallback to session
-    user = session.get("user")
-    if not user:
-        return jsonify({
-            "status": "error",
-            "message": "Session expired or user is not logged in"
-        }), 401
-    return jsonify({
-        "status": "success",
-        "user": user
-    }), 200
-
-# Clear the authenticated user's session.
-# Clear the authenticated user's session.
-@app.route("/api/logout", methods=["POST", "GET", "OPTIONS"])
-def logout():
-    try:
-        # Clear session
-        session.clear()
-        
-        # Also clear any session cookies
-        response = jsonify({
-            "status": "success",
-            "message": "Logged out successfully"
-        })
-        
-        # Remove the session cookie
-        response.set_cookie('tapin_session', '', expires=0)
-        response.set_cookie('session', '', expires=0)
-        
-        print("User logged out successfully")
-        return response, 200
-    except Exception as e:
-        print(f"Logout error: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Logout failed: {str(e)}"
-        }), 500
-
-# Semi Web Routes
-# Return the latest RFID scan and online devices for the web dashboard.
-@app.route("/api/get-latest-rfid", methods=["GET"])
-def get_latest_rfid():
-    rfid = latest_scan.get("rfid")
-    scanned_at = latest_scan.get("scanned_at")
-    employee = employee_database.get(rfid) if rfid else None
-
-    return jsonify({
-        "status": "success",
-        "rfid": rfid,
-        "scanned_at": scanned_at,
-        "devices": get_online_devices(),
-        "found": bool(employee),
-        "employee": {
-            "uid": employee.get("uid"),
-            "rfid": employee.get("rfid"),
-            "employeeid": employee.get("employeeid"),
-            "lastname": employee.get("lastname"),
-            "firstname": employee.get("firstname"),
-            "role": employee.get("role"),
-            "image": employee.get("image")
-        } if employee else None
-    }), 200
-
-# Web display route for current device heartbeats.
-# Return devices that have sent a recent ping.
-@app.route("/api/get-device-status", methods=["GET"])
-def get_device_status():
-    return jsonify({
-        "status": "success",
-        "devices": get_online_devices()
-    }), 200
-
-# Return live employee and RFID totals for the dashboard cards.
-@app.route("/api/dashboard-stats", methods=["GET"])
-def dashboard_stats():
-    return jsonify({
-        "status": "success",
-        "stats": get_dashboard_statistics()
-    }), 200
-
+## Dashboard Routes ------------------------------------
 # Return all current dashboard data in one authenticated response.
 @app.route("/api/dashboard-data", methods=["GET"])
 def dashboard_data():
@@ -973,6 +1039,49 @@ def dashboard_data():
     return jsonify({
         "status": "success",
         "data": get_dashboard_data()
+    }), 200
+
+# Return live employee and RFID totals for the dashboard cards.
+@app.route("/api/dashboard-stats", methods=["GET"])
+def dashboard_stats():
+    return jsonify({
+        "status": "success",
+        "stats": get_dashboard_statistics()
+    }), 200
+
+# Serve scan feed data
+@app.route("/api/scan-feed", methods=["GET"])
+def get_scan_feed():
+    """Get the full scan feed data"""
+    scan_feed_data = load_scan_feed()
+    return jsonify({
+        "status": "success",
+        "data": scan_feed_data
+    }), 200
+
+# Return devices that have sent a recent ping.
+@app.route("/api/get-device-status", methods=["GET"])
+def get_device_status():
+    return jsonify({
+        "status": "success",
+        "devices": get_online_devices()
+    }), 200
+
+# Check whether one device is currently online.
+@app.route("/api/check-device/<device_id>", methods=["GET"])
+def check_device(device_id):
+    remove_offline_devices()
+    data = device_status.get(device_id)
+    if not data:
+        return jsonify({
+            "status": "unknown",
+            "message": "Device not found"
+        }), 404
+    return jsonify({
+        "status": "success",
+        "device_id": device_id,
+        "device_status": data["status"],
+        "last_seen": data["last_seen"]
     }), 200
 
 # Return persistent DTR records for a requested month.
@@ -1000,22 +1109,28 @@ def get_attendance():
         "records": records
     }), 200
 
-# API routes
-# Check whether one device is currently online.
-@app.route("/api/check-device/<device_id>", methods=["GET"])
-def check_device(device_id):
-    remove_offline_devices()
-    data = device_status.get(device_id)
-    if not data:
-        return jsonify({
-            "status": "unknown",
-            "message": "Device not found"
-        }), 404
+# Return the latest RFID scan and online devices for the web dashboard.
+@app.route("/api/get-latest-rfid", methods=["GET"])
+def get_latest_rfid():
+    rfid = latest_scan.get("rfid")
+    scanned_at = latest_scan.get("scanned_at")
+    employee = employee_database.get(rfid) if rfid else None
+
     return jsonify({
         "status": "success",
-        "device_id": device_id,
-        "device_status": data["status"],
-        "last_seen": data["last_seen"]
+        "rfid": rfid,
+        "scanned_at": scanned_at,
+        "devices": get_online_devices(),
+        "found": bool(employee),
+        "employee": {
+            "uid": employee.get("uid"),
+            "rfid": employee.get("rfid"),
+            "employeeid": employee.get("employeeid"),
+            "lastname": employee.get("lastname"),
+            "firstname": employee.get("firstname"),
+            "role": employee.get("role"),
+            "image": employee.get("image")
+        } if employee else None
     }), 200
 
 # Reload users.json into the in-memory RFID lookup database.
@@ -1030,7 +1145,7 @@ def reload_db():
         "total": len(employee_database)
     }), 200
 
-# IoT Routes
+## IoT Routes ------------------------------------
 # Receive a heartbeat ping from an RFID device.
 @app.route("/api/device-ping", methods=["POST"])
 def device_ping():
@@ -1062,7 +1177,7 @@ def device_ping():
             "message": str(e)
         }), 500
 
-# FIXED: Receive an RFID scan and match it to a user record.
+# Receive an RFID scan and match it to a user record.
 @app.route("/api/receive-rfid", methods=["POST"])
 def receive_rfid():
     try:
@@ -1091,6 +1206,14 @@ def receive_rfid():
 
         latest_scan["rfid"] = rfid
         latest_scan["scanned_at"] = scanned_at
+        
+        # Add to scan feed (detailed log)
+        employee = employee_database.get(rfid)
+        found = bool(employee)
+        
+        # Add to scan feed with employee details if found
+        add_scan_to_feed(rfid, scanned_at, employee, found)
+        
         scan_event = {
             "rfid": rfid,
             "scanned_at": scanned_at,
@@ -1098,7 +1221,6 @@ def receive_rfid():
         }
         scan_events.append(scan_event)
 
-        employee = employee_database.get(rfid)
         if employee:
             print(f"RFID matched: {employee['firstname']} {employee['lastname']}")
             record_attendance_scan(employee, scanned_at)
@@ -1112,7 +1234,7 @@ def receive_rfid():
             "message": "RFID received",
             "rfid": rfid,
             "scanned_at": scanned_at,
-            "found": bool(employee)
+            "found": found
         }
         
         if employee:
@@ -1132,7 +1254,7 @@ def receive_rfid():
             "message": f"Server error: {str(e)}"
         }), 500
 
-# Error Handlers
+## Error Handlers ------------------------------------
 # Return a consistent JSON response for unknown routes.
 @app.errorhandler(404)
 def page_not_found(e):
@@ -1142,16 +1264,17 @@ def page_not_found(e):
         "timestamp": datetime.now().isoformat()
     }), 404
 
-# OPTIONS handlers for CORS preflight
+## OPTIONS Handlers ------------------------------------
 @app.route("/api/login", methods=["OPTIONS"])
-@app.route("/api/session", methods=["OPTIONS"])
+@app.route("/api/session", methods["OPTIONS"])
 @app.route("/api/logout", methods=["OPTIONS"])
 @app.route("/api/dashboard-data", methods=["OPTIONS"])
 @app.route("/api/verify-token", methods=["OPTIONS"])
 @app.route("/api/register-employee", methods=["OPTIONS"])
 @app.route("/api/update-employee/<rfid>", methods=["OPTIONS"])
-@app.route("/api/receive-rfid", methods=["OPTIONS"])
+@app.route("/api/receive-rfid", methods["OPTIONS"])
 @app.route("/api/device-ping", methods=["OPTIONS"])
+@app.route("/api/scan-feed", methods=["OPTIONS"])
 def handle_options():
     response = jsonify({"status": "ok"})
     origin = request.headers.get("Origin")
@@ -1162,7 +1285,7 @@ def handle_options():
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
     return response, 200
 
-## Main
+## Main ------------------------------------
 if __name__ == "__main__":
     # Initialize attendance records for all users at startup
     # This only ADDS missing records, never overwrites existing ones
